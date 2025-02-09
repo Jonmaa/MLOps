@@ -4,6 +4,8 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 import mlflow
 import mlflow.pytorch
+from mlflow.models import infer_signature
+import numpy as np
 
 # Cargar datos MNIST
 transform = transforms.Compose([transforms.ToTensor()])
@@ -50,8 +52,16 @@ with mlflow.start_run():
         mlflow.log_metric("training_loss", avg_loss, step=epoch)
         print(f"🔄 Epoch {epoch+1}, Loss: {avg_loss:.4f}")
 
-    # Guardar el modelo en MLflow
-    mlflow.pytorch.log_model(model, "mnist_model")
+    # Crear un ejemplo de entrada (un batch de imágenes aleatorias)
+    example_input = torch.randn(1, 1, 28, 28)
+    example_input_numpy = example_input.numpy()  # Convertirlo a numpy porque no acepta el formato torch.Tensor
+    example_output = model(example_input) 
+    
+    # Generar la firma del modelo automáticamente
+    signature = infer_signature(example_input.numpy(), example_output.detach().numpy())
+    
+    # Guardar el modelo con firma y ejemplo de entrada
+    mlflow.pytorch.log_model(model, "mnist_model", signature=signature, input_example=example_input_numpy)
 
     # Guardar modelo localmente también
     torch.save(model.state_dict(), "modelo_entrenado.pth")
