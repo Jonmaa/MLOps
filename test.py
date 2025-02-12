@@ -3,7 +3,7 @@ import torch.nn as nn
 from torchvision import datasets, transforms
 import mlflow
 import mlflow.pytorch
-from main import SimpleNN  # Importamos el modelo
+from main import SimpleNN, DeepNN  # Importamos el modelo
 
 # Cargar datos de test MNIST
 transform = transforms.Compose([transforms.ToTensor()])
@@ -11,7 +11,7 @@ test_dataset = datasets.MNIST(root='./data', train=False, transform=transform, d
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 # Cargar el modelo entrenado desde MLflow
-model = SimpleNN()
+model = DeepNN()
 model.load_state_dict(torch.load("modelo_entrenado.pth"))
 model.eval()
 
