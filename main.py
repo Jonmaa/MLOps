@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 from torchvision import datasets, transforms
 import mlflow
 import mlflow.pytorch
@@ -134,11 +135,11 @@ class ResNetMNIST(nn.Module): # Variante de ResNet para MNIST
         x = torch.relu(self.bn2(self.conv3(x)))
         x = self.pool(x)
         
-        x = x.view(-1, 64 * 7 * 7)
+        x = x.view(x.size(0), -1)
         x = torch.relu(self.fc1(x))
         x = self.dropout(x)
         x = self.fc2(x)
-        return x
+        return F.log_softmax(x, dim=1)
 
 model = ResNetMNIST()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
