@@ -4,6 +4,7 @@ from torchvision import datasets, transforms
 import mlflow
 import mlflow.pytorch
 import pickle
+from main import SimpleNN, DeepNN, DeepNN_BN, CNN_Model
 
 # Cargar datos de test MNIST
 transform = transforms.Compose([transforms.ToTensor()])
