@@ -6,6 +6,7 @@ import mlflow
 import mlflow.pytorch
 from mlflow.models import infer_signature
 import numpy as np
+import pickle
 
 # Cargar datos MNIST
 transform = transforms.Compose([transforms.ToTensor()])
@@ -49,7 +50,97 @@ class DeepNN(nn.Module):
         x = self.fc5(x)
         return x
 
-model = DeepNN()
+class DeepNN_BN(nn.Module): # DeepNN con capas de Batch Normalization para estabilizar el entrenamiento
+    def __init__(self):
+        super(DeepNN_BN, self).__init__()
+        self.fc1 = nn.Linear(28*28, 512)
+        self.bn1 = nn.BatchNorm1d(512)
+        self.fc2 = nn.Linear(512, 256)
+        self.bn2 = nn.BatchNorm1d(256)
+        self.fc3 = nn.Linear(256, 128)
+        self.bn3 = nn.BatchNorm1d(128)
+        self.fc4 = nn.Linear(128, 64)
+        self.bn4 = nn.BatchNorm1d(64)
+        self.fc5 = nn.Linear(64, 10)
+
+        self.dropout = nn.Dropout(p=0.3)
+
+    def forward(self, x):
+        x = x.view(-1, 28*28)
+        x = torch.relu(self.bn1(self.fc1(x)))
+        x = self.dropout(x)
+        x = torch.relu(self.bn2(self.fc2(x)))
+        x = self.dropout(x)
+        x = torch.relu(self.bn3(self.fc3(x)))
+        x = self.dropout(x)
+        x = torch.relu(self.bn4(self.fc4(x)))
+        x = self.dropout(x)
+        x = self.fc5(x)
+        return x
+
+class CNN_Model(nn.Module): # Modelo de red convolucional para mejorar los patrones de las imágenes
+    def __init__(self):
+        super(CNN_Model, self).__init__()
+        
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        
+        self.pool = nn.MaxPool2d(2, 2)  # Reduce el tamaño a la mitad
+        
+        self.fc1 = nn.Linear(64 * 7 * 7, 128)
+        self.fc2 = nn.Linear(128, 10)
+        
+        self.dropout = nn.Dropout(0.3)
+
+    def forward(self, x):
+        x = torch.relu(self.bn1(self.conv1(x)))
+        x = self.pool(x)
+        x = torch.relu(self.bn2(self.conv2(x)))
+        x = self.pool(x)
+        
+        x = x.view(-1, 64 * 7 * 7)  # Aplanar antes de pasar a las capas densas
+        x = torch.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
+
+class ResNetMNIST(nn.Module): # Variante de ResNet para MNIST
+    def __init__(self):
+        super(ResNetMNIST, self).__init__()
+        
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        
+        self.bn1 = nn.BatchNorm2d(32)
+        self.bn2 = nn.BatchNorm2d(64)
+        
+        self.pool = nn.MaxPool2d(2, 2)
+        
+        self.fc1 = nn.Linear(64 * 7 * 7, 128)
+        self.fc2 = nn.Linear(128, 10)
+
+        self.dropout = nn.Dropout(0.3)
+
+    def forward(self, x):
+        x = torch.relu(self.bn1(self.conv1(x)))
+        residual = x  # Guardamos la salida para la conexión residual
+        
+        x = torch.relu(self.conv2(x))
+        x += residual  # Conexión residual
+
+        x = torch.relu(self.bn2(self.conv3(x)))
+        x = self.pool(x)
+        
+        x = x.view(-1, 64 * 7 * 7)
+        x = torch.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
+
+model = ResNetMNIST()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 criterion = nn.CrossEntropyLoss()
 
@@ -88,6 +179,7 @@ with mlflow.start_run():
     mlflow.pytorch.log_model(model, "mnist_model", signature=signature, input_example=example_input_numpy)
 
     # Guardar modelo localmente también
-    torch.save(model.state_dict(), "modelo_entrenado.pth")
+    with open("modelo_entrenado.pth", "wb") as f:
+        pickle.dump(model, f)
 
 print("✅ Entrenamiento finalizado y modelo registrado en MLflow.")

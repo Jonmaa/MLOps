@@ -3,7 +3,7 @@ import torch.nn as nn
 from torchvision import datasets, transforms
 import mlflow
 import mlflow.pytorch
-from main import SimpleNN, DeepNN  # Importamos el modelo
+import pickle
 
 # Cargar datos de test MNIST
 transform = transforms.Compose([transforms.ToTensor()])
@@ -11,8 +11,8 @@ test_dataset = datasets.MNIST(root='./data', train=False, transform=transform, d
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 # Cargar el modelo entrenado desde MLflow
-model = DeepNN()
-model.load_state_dict(torch.load("modelo_entrenado.pth"))
+with open("modelo_entrenado.pkl", "rb") as f:
+    model = pickle.load(f)
 model.eval()
 
 # Evaluación del modelo
