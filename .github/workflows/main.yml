@@ -25,15 +25,20 @@ jobs:
           pip install -r requirements.txt
 
       - name: Entrenar modelo con MLflow
-        run: python main.py
+        run: python main.py      
 
-      - name: Evaluar modelo con MLflow
-        run: python test.py
-
-      - name: Guardar modelo (solo si pasa el test)
+      - name: Guardar modelo (solo si se entrena correctamente)
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: mnist-model
-          path: modelo_entrenado.pth
+          path: modelo_entrenado.pkl
+      
+      - name: Descargar el modelo entrenado
+        uses: actions/download-artifact@v4
+        with:
+          name: mnist-model
+
+      - name: Evaluar modelo con MLflow
+        run: python test.py
 

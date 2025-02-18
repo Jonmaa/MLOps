@@ -147,7 +147,7 @@ with mlflow.start_run():
     mlflow.pytorch.log_model(model, "mnist_model", signature=signature, input_example=example_input_numpy)
 
     # Guardar modelo localmente también
-    with open("modelo_entrenado.pth", "wb") as f:
+    with open("modelo_entrenado.pkl", "wb") as f:
         pickle.dump(model, f)
 
 print("✅ Entrenamiento finalizado y modelo registrado en MLflow.")
