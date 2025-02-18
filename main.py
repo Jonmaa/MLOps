@@ -107,41 +107,8 @@ class CNN_Model(nn.Module): # Modelo de red convolucional para mejorar los patro
         x = self.fc2(x)
         return x
 
-class ResNetMNIST(nn.Module): # Variante de ResNet para MNIST
-    def __init__(self):
-        super(ResNetMNIST, self).__init__()
-        
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(32, 32, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        
-        self.bn1 = nn.BatchNorm2d(32)
-        self.bn2 = nn.BatchNorm2d(64)
-        
-        self.pool = nn.MaxPool2d(2, 2)
-        
-        self.fc1 = nn.Linear(64 * 7 * 7, 128)
-        self.fc2 = nn.Linear(128, 10)
 
-        self.dropout = nn.Dropout(0.3)
-
-    def forward(self, x):
-        x = torch.relu(self.bn1(self.conv1(x)))
-        residual = x  # Guardamos la salida para la conexión residual
-        
-        x = torch.relu(self.conv2(x))
-        x += residual  # Conexión residual
-
-        x = torch.relu(self.bn2(self.conv3(x)))
-        x = self.pool(x)
-        
-        x = x.view(x.size(0), -1)
-        x = torch.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
-        return F.log_softmax(x, dim=1)
-
-model = ResNetMNIST()
+model = CNN_Model()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 criterion = nn.CrossEntropyLoss()
 
