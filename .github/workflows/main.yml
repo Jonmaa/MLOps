@@ -25,7 +25,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Entrenar modelo con MLflow
-        run: python main.py      
+        run: python mlflowMain.py      
 
       - name: Guardar modelo (solo si se entrena correctamente)
         if: success()
@@ -40,5 +40,5 @@ jobs:
           name: mnist-model
 
       - name: Evaluar modelo con MLflow
-        run: python test.py
+        run: python mlflowTest.py
 
