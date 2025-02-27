@@ -2,3 +2,5 @@ torch
 torchvision
 mlflow
 numpy
+metaflow
+metaflow-ui
