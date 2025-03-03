@@ -27,7 +27,7 @@ jobs:
             metaflow:
               - 'metaflowMain.py'
 
-  train_and_test:
+  MLflow_job:
     needs: check-files
     if: needs.check-files.outputs.mlflow_changed == 'true'
     runs-on: ubuntu-latest
@@ -62,13 +62,23 @@ jobs:
       - name: Evaluar modelo con MLflow
         run: python mlflowTest.py
 
-  other_job:
+  Metaflow_job:
     needs: check-files
     if: needs.check-files.outputs.metaflow_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Ejecutar otro script
         run: python metaflowMain.py
