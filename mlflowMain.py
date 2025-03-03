@@ -10,9 +10,11 @@ import numpy as np
 import pickle
 
 # Cargar datos MNIST
+batch_size = 64
+lr = 0.01
 transform = transforms.Compose([transforms.ToTensor()])
 train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=True)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
 # Definición del modelo
 class SimpleNN(nn.Module):
@@ -51,33 +53,6 @@ class DeepNN(nn.Module):
         x = self.fc5(x)
         return x
 
-class DeepNN_BN(nn.Module): # DeepNN con capas de Batch Normalization para estabilizar el entrenamiento
-    def __init__(self):
-        super(DeepNN_BN, self).__init__()
-        self.fc1 = nn.Linear(28*28, 512)
-        self.bn1 = nn.BatchNorm1d(512)
-        self.fc2 = nn.Linear(512, 256)
-        self.bn2 = nn.BatchNorm1d(256)
-        self.fc3 = nn.Linear(256, 128)
-        self.bn3 = nn.BatchNorm1d(128)
-        self.fc4 = nn.Linear(128, 64)
-        self.bn4 = nn.BatchNorm1d(64)
-        self.fc5 = nn.Linear(64, 10)
-
-        self.dropout = nn.Dropout(p=0.3)
-
-    def forward(self, x):
-        x = x.view(-1, 28*28)
-        x = torch.relu(self.bn1(self.fc1(x)))
-        x = self.dropout(x)
-        x = torch.relu(self.bn2(self.fc2(x)))
-        x = self.dropout(x)
-        x = torch.relu(self.bn3(self.fc3(x)))
-        x = self.dropout(x)
-        x = torch.relu(self.bn4(self.fc4(x)))
-        x = self.dropout(x)
-        x = self.fc5(x)
-        return x
 
 class CNN_Model(nn.Module): # Modelo de red convolucional para mejorar los patrones de las imágenes
     def __init__(self):
@@ -108,8 +83,8 @@ class CNN_Model(nn.Module): # Modelo de red convolucional para mejorar los patro
         return x
 
 
-model = DeepNN_BN()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+model = CNN_Model()
+optimizer = optim.Adam(model.parameters(), lr=lr)
 criterion = nn.CrossEntropyLoss()
 
 # Iniciar experimento en MLflow
@@ -117,8 +92,8 @@ mlflow.set_experiment("MNIST-Classification")
 
 with mlflow.start_run():
     # Registrar hiperparámetros
-    mlflow.log_param("learning_rate", 0.001)
-    mlflow.log_param("batch_size", 32)
+    mlflow.log_param("learning_rate", lr)
+    mlflow.log_param("batch_size", batch_size)
 
     # Entrenar modelo
     for epoch in range(5):
@@ -136,7 +111,7 @@ with mlflow.start_run():
         print(f"🔄 Epoch {epoch+1}, Loss: {avg_loss:.4f}")
 
     # Crear un ejemplo de entrada (un batch de imágenes aleatorias)
-    example_input = torch.randn(1, 1, 28, 28)
+    example_input = torch.randn(4, 1, 28, 28)
     example_input_numpy = example_input.numpy()  # Convertirlo a numpy porque no acepta el formato torch.Tensor
     example_output = model(example_input) 
     

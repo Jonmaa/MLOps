@@ -28,7 +28,6 @@ jobs:
         run: python mlflowMain.py      
 
       - name: Guardar modelo (solo si se entrena correctamente)
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: mnist-model

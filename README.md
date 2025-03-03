@@ -8,13 +8,17 @@ Intento de implementación de un modelo de IA clasificador de MINST con Mlflow y
 pip install -r requirements.txt
 ```
 
-### Para ejecutar los ficheros relacionados con Mlflow
+### Para ejecutar los ficheros relacionados con Mlflow y visualizar en la UI
 ```bash
 python mlflowMain.py
 ```
 
 ```bash
 python mlflowTest.py
+```
+
+```bash
+python mlflow ui
 ```
 
 ## Pipeline
