@@ -7,9 +7,30 @@ on:
   pull_request:
 
 jobs:
-  train_and_test:
+  check-files:
     runs-on: ubuntu-latest
+    outputs:
+      mlflow_changed: ${{ steps.filter.outputs.mlflow }}
+      metaflow_changed: ${{ steps.filter.outputs.metaflow }}
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
 
+      - name: Filtrar archivos modificados
+        id: filter
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            mlflow:
+              - 'mlflowMain.py'
+              - 'mlflowTest.py'
+            metaflow:
+              - 'metaflowMain.py'
+
+  train_and_test:
+    needs: check-files
+    if: needs.check-files.outputs.mlflow_changed == 'true'
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
@@ -41,3 +62,13 @@ jobs:
       - name: Evaluar modelo con MLflow
         run: python mlflowTest.py
 
+  other_job:
+    needs: check-files
+    if: needs.check-files.outputs.metaflow_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Ejecutar otro script
+        run: python metaflowMain.py

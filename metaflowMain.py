@@ -1,356 +1,182 @@
-from metaflow import FlowSpec, step, Parameter, current
-import numpy as np
+from metaflow import FlowSpec, step, Parameter, IncludeFile, card, current
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
-from sklearn.metrics import classification_report
+import pickle
 import matplotlib.pyplot as plt
-import os
-import pickle  # Using pickle instead of joblib
+import seaborn as sns
+import numpy as np
+import base64
+import io
+from sklearn.metrics import confusion_matrix
+from PIL import Image
 
-class SimpleMLP(nn.Module):
-    """
-    Simple Multi-Layer Perceptron for MNIST digit classification.
-    """
-    def __init__(self, hidden_size=128):
-        super(SimpleMLP, self).__init__()
-        self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(28 * 28, hidden_size)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_size, 10)
-        
+# Definición del modelo CNN
+class CNN_Model(nn.Module):
+    def __init__(self):
+        super(CNN_Model, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.fc1 = nn.Linear(64 * 7 * 7, 128)
+        self.fc2 = nn.Linear(128, 10)
+        self.dropout = nn.Dropout(0.3)
+
     def forward(self, x):
-        x = self.flatten(x)  # Flatten the 28x28 image to a 784-dim vector
-        x = self.fc1(x)
-        x = self.relu(x)
+        x = torch.relu(self.bn1(self.conv1(x)))
+        x = self.pool(x)
+        x = torch.relu(self.bn2(self.conv2(x)))
+        x = self.pool(x)
+        x = x.view(-1, 64 * 7 * 7)
+        x = torch.relu(self.fc1(x))
+        x = self.dropout(x)
         x = self.fc2(x)
         return x
 
+class SimpleNN(nn.Module):
+    def __init__(self):
+        super(SimpleNN, self).__init__()
+        self.fc1 = nn.Linear(28*28, 128)
+        self.fc2 = nn.Linear(128, 10) # 10 salidas diferentes, una por cada dígito (0-9)
+
+    def forward(self, x):
+        x = x.view(-1, 28*28) # Aplanar la imagen a un vector de 784 valores
+        x = torch.relu(self.fc1(x)) # Relu como función de activación
+        x = self.fc2(x)
+        return x
+
+class DeepNN(nn.Module):
+    def __init__(self):
+        super(DeepNN, self).__init__()
+        self.fc1 = nn.Linear(28*28, 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.fc3 = nn.Linear(256, 128)
+        self.fc4 = nn.Linear(128, 64)
+        self.fc5 = nn.Linear(64, 10)
+
+        self.dropout = nn.Dropout(p=0.3)
+
+    def forward(self, x):
+        x = x.view(-1, 28*28)
+        x = torch.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = torch.relu(self.fc2(x))
+        x = self.dropout(x)
+        x = torch.relu(self.fc3(x))
+        x = self.dropout(x)
+        x = torch.relu(self.fc4(x))
+        x = self.dropout(x)
+        x = self.fc5(x)
+        return x
+
 class MNISTFlow(FlowSpec):
-    """
-    A simplified Metaflow flow for training an MNIST digit classification model with PyTorch.
-    """
     
-    epochs = Parameter('epochs', default=3, help='Number of training epochs')
-    batch_size = Parameter('batch_size', default=128, help='Batch size for training')
-    learning_rate = Parameter('learning_rate', default=0.01, help='Learning rate')
-    hidden_size = Parameter('hidden_size', default=128, help='Hidden layer size')
+    batch_size = Parameter('batch_size', default=64, help='Tamaño del batch')
+    lr = Parameter('learning_rate', default=0.01, help='Tasa de aprendizaje')
+    epochs = Parameter('epochs', default=5, help='Número de épocas')
     
     @step
     def start(self):
-        """
-        Start the flow and print some information.
-        """
-        print("Starting simplified MNIST classification flow with PyTorch")
-        print(f"Using PyTorch version: {torch.__version__}")
-        
-        # Set random seeds for reproducibility
-        torch.manual_seed(42)
-        np.random.seed(42)
-        
-        # Use CPU for simplicity
-        self.device = torch.device("cpu")
-        print(f"Using device: {self.device}")
-        
+        print("📌 Inicio del flujo de entrenamiento MNIST")
         self.next(self.load_data)
     
     @step
     def load_data(self):
-        """
-        Load and prepare the MNIST dataset.
-        """
-        print("Loading MNIST dataset...")
-        
-        # Define transformations - just convert to tensor and normalize
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307,), (0.3081,))
-        ])
-        
-        # Load training and test datasets
-        self.train_dataset = datasets.MNIST(
-            root='./data', 
-            train=True, 
-            download=True, 
-            transform=transform
-        )
-        
-        self.test_dataset = datasets.MNIST(
-            root='./data', 
-            train=False, 
-            download=True, 
-            transform=transform
-        )
-        
-        # Create data loaders
-        self.train_loader = DataLoader(
-            self.train_dataset, 
-            batch_size=self.batch_size, 
-            shuffle=True
-        )
-        
-        self.test_loader = DataLoader(
-            self.test_dataset, 
-            batch_size=self.batch_size, 
-            shuffle=False
-        )
-        
-        print(f"Training dataset size: {len(self.train_dataset)}")
-        print(f"Test dataset size: {len(self.test_dataset)}")
-        
-        self.next(self.build_model)
-    
-    @step
-    def build_model(self):
-        """
-        Build a simple MLP model.
-        """
-        print("Building simple MLP model...")
-        self.model = SimpleMLP(hidden_size=self.hidden_size).to(self.device)
-        
-        # Define loss function and optimizer
-        self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = optim.SGD(
-            self.model.parameters(), 
-            lr=self.learning_rate,
-            momentum=0.9
-        )
-        
-        # Print model summary
-        print(self.model)
-        total_params = sum(p.numel() for p in self.model.parameters())
-        print(f"Total parameters: {total_params}")
-        
+        print("📥 Cargando datos MNIST...")
+        transform = transforms.Compose([transforms.ToTensor()])
+        train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
+        test_dataset = datasets.MNIST(root='./data', train=False, transform=transform, download=True)
+        self.train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
+        self.test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
         self.next(self.train_model)
     
     @step
     def train_model(self):
-        """
-        Train the MLP model on the MNIST dataset.
-        """
-        print(f"Training model for {self.epochs} epochs...")
-        
-        # Create a directory for this run's artifacts
-        self.run_id = current.run_id
-        self.artifact_dir = f"artifacts/{self.run_id}"
-        os.makedirs(self.artifact_dir, exist_ok=True)
-        
-        # Training loop
-        self.train_losses = []
-        self.train_accs = []
-        
+        print("🚀 Entrenando modelo...")
+        self.model = SimpleNN()
+        optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
+        criterion = nn.CrossEntropyLoss()
+
         for epoch in range(self.epochs):
-            # Training phase
-            self.model.train()
-            running_loss = 0.0
-            correct = 0
-            total = 0
-            
-            for batch_idx, (inputs, targets) in enumerate(self.train_loader):
-                inputs, targets = inputs.to(self.device), targets.to(self.device)
-                
-                # Zero the parameter gradients
-                self.optimizer.zero_grad()
-                
-                # Forward pass
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets)
-                
-                # Backward pass and optimize
+            total_loss = 0
+            for images, labels in self.train_loader:
+                optimizer.zero_grad()
+                outputs = self.model(images)
+                loss = criterion(outputs, labels)
                 loss.backward()
-                self.optimizer.step()
-                
-                # Track statistics
-                running_loss += loss.item()
-                _, predicted = outputs.max(1)
-                total += targets.size(0)
-                correct += predicted.eq(targets).sum().item()
-                
-                if batch_idx % 100 == 0:
-                    print(f"Epoch {epoch+1}/{self.epochs} | Batch {batch_idx}/{len(self.train_loader)} | "
-                          f"Loss: {running_loss/(batch_idx+1):.4f} | "
-                          f"Acc: {100.*correct/total:.2f}%")
-            
-            train_loss = running_loss / len(self.train_loader)
-            train_acc = 100. * correct / total
-            self.train_losses.append(train_loss)
-            self.train_accs.append(train_acc)
-            
-            print(f"Epoch {epoch+1}/{self.epochs} | "
-                  f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}%")
-        
-        # Save the model using pickle with .pkl extension
-        self.model_path = f"{self.artifact_dir}/mnist_model.pkl"
-        
-        # Move model to CPU if it's not already there
-        self.model = self.model.to('cpu')
-        
-        # Save the model using pickle
-        with open(self.model_path, 'wb') as f:
+                optimizer.step()
+                total_loss += loss.item()
+            print(f"🔄 Epoch {epoch+1}, Loss: {total_loss / len(self.train_loader):.4f}")
+        self.next(self.save_model)
+    
+    @step
+    def save_model(self):
+        print("💾 Guardando modelo entrenado...")
+        with open("modelo_entrenado.pkl", "wb") as f:
             pickle.dump(self.model, f)
-        
-        print(f"Model saved to {self.model_path}")
-        
+        print("✅ Modelo guardado correctamente.")
         self.next(self.evaluate_model)
     
+    @card
     @step
     def evaluate_model(self):
-        """
-        Evaluate the trained model on the test set.
-        """
-        print("Evaluating model on test data...")
-        
-        self.model.eval()
-        test_loss = 0.0
-        correct = 0
-        total = 0
-        
-        all_preds = []
-        all_targets = []
-        
-        with torch.no_grad():
-            for inputs, targets in self.test_loader:
-                inputs, targets = inputs.to(self.device), targets.to(self.device)
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets)
-                
-                test_loss += loss.item()
-                _, predicted = outputs.max(1)
-                total += targets.size(0)
-                correct += predicted.eq(targets).sum().item()
-                
-                all_preds.extend(predicted.cpu().numpy())
-                all_targets.extend(targets.cpu().numpy())
-        
-        self.test_loss = test_loss / len(self.test_loader)
-        self.test_accuracy = 100. * correct / total
-        
-        print(f"Test Loss: {self.test_loss:.4f} | Test Accuracy: {self.test_accuracy:.2f}%")
-        
-        # Generate classification report
-        report = classification_report(all_targets, all_preds)
-        print("\nClassification Report:")
-        print(report)
-        
-        # Save classification report
-        with open(f"{self.artifact_dir}/classification_report.txt", "w") as f:
-            f.write(report)
-        
-        # Save some test data for visualization
-        dataiter = iter(self.test_loader)
-        self.test_images, self.test_labels = next(dataiter)
-        self.test_images = self.test_images[:10].cpu()  # Get 10 images
-        self.test_labels = self.test_labels[:10].cpu()
-        
-        # Get predictions for these images
-        self.model.eval()
-        with torch.no_grad():
-            outputs = self.model(self.test_images)
-            _, self.test_preds = outputs.max(1)
-        
-        self.next(self.visualize_results)
-    
-    @step
-    def visualize_results(self):
-        """
-        Visualize training history and some predictions.
-        """
-        print("Visualizing results...")
-        
-        # Plot training curves
-        plt.figure(figsize=(12, 5))
-        
-        plt.subplot(1, 2, 1)
-        plt.plot(range(1, self.epochs + 1), self.train_accs, 'b-')
-        plt.title('Model Accuracy')
-        plt.ylabel('Accuracy (%)')
-        plt.xlabel('Epoch')
-        plt.grid(True)
-        
-        plt.subplot(1, 2, 2)
-        plt.plot(range(1, self.epochs + 1), self.train_losses, 'r-')
-        plt.title('Model Loss')
-        plt.ylabel('Loss')
-        plt.xlabel('Epoch')
-        plt.grid(True)
-        
-        plt.tight_layout()
-        plt.savefig(f"{self.artifact_dir}/training_history.png")
-        
-        # Visualize sample predictions
-        plt.figure(figsize=(12, 5))
-        for i in range(10):
-            plt.subplot(2, 5, i+1)
-            img = self.test_images[i].squeeze().numpy()
-            plt.imshow(img, cmap='gray')
-            
-            pred_class = self.test_preds[i].item()
-            true_class = self.test_labels[i].item()
-            
-            plt.title(f"Pred: {pred_class}\nTrue: {true_class}")
-            plt.axis('off')
-        
-        plt.tight_layout()
-        plt.savefig(f"{self.artifact_dir}/prediction_samples.png")
-        
-        # Create confusion matrix
-        try:
-            from sklearn.metrics import confusion_matrix
-            import seaborn as sns
-            
-            # Get predictions on the entire test set
-            self.model.eval()
-            all_preds = []
-            all_targets = []
-            
-            with torch.no_grad():
-                for inputs, targets in self.test_loader:
-                    inputs = inputs.to(self.device)
-                    outputs = self.model(inputs)
-                    _, predicted = outputs.max(1)
-                    all_preds.extend(predicted.cpu().numpy())
-                    all_targets.extend(targets.numpy())
-            
-            # Create confusion matrix
-            cm = confusion_matrix(all_targets, all_preds)
-            
-            plt.figure(figsize=(10, 8))
-            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-            plt.title('Confusion Matrix')
-            plt.ylabel('True Label')
-            plt.xlabel('Predicted Label')
-            plt.savefig(f"{self.artifact_dir}/confusion_matrix.png")
-        except:
-            print("Skipping confusion matrix visualization")
-        
-        self.next(self.end)
-    
+       print("📊 Evaluando el modelo...")
+       self.model.eval()
+       correct = 0
+       total = 0
+       all_preds = []
+       all_labels = []
+       test_images = []
+
+       with torch.no_grad():
+           for images, labels in self.test_loader:
+               outputs = self.model(images)
+               _, predicted = torch.max(outputs, 1)
+               total += labels.size(0)
+               correct += (predicted == labels).sum().item()
+               all_preds.extend(predicted.numpy())
+               all_labels.extend(labels.numpy())
+               test_images.extend(images.numpy())
+
+       accuracy = correct / total
+       print(f"✅ Precisión del modelo: {accuracy * 100:.2f}%")
+
+       # Seleccionar 10 imágenes del test
+       num_samples = 10
+       sample_images = test_images[:num_samples]
+       sample_labels = all_labels[:num_samples]
+       sample_preds = all_preds[:num_samples]
+
+       # Crear la figura
+       fig, axes = plt.subplots(1, num_samples, figsize=(15, 3))
+       for i, ax in enumerate(axes):
+           ax.imshow(sample_images[i].squeeze(), cmap='gray')
+           ax.set_title(f"Pred: {sample_preds[i]}\nReal: {sample_labels[i]}")
+           ax.axis("off")
+
+       # Guardar la imagen en un buffer
+       buffer = io.BytesIO()
+       plt.savefig(buffer, format='png')
+       buffer.seek(0)
+       plt.close()
+
+       # Convertir la imagen en Base64
+       import base64
+       img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+
+       # Agregar la imagen a la card de Metaflow
+       current.card.append(f'<h3>🔍 Ejemplos de predicciones</h3>')
+       current.card.append(f'<img src="data:image/png;base64,{img_base64}" width="800"/>')
+
+       print("📸 Predicciones visualizadas en la card de Metaflow")
+       self.next(self.end)
+
     @step
     def end(self):
-        """
-        End the flow and print final results.
-        """
-        print("\nSimplified MNIST Flow completed successfully!")
-        print(f"Final test accuracy: {self.test_accuracy:.2f}%")
-        print(f"All artifacts saved to: {self.artifact_dir}/")
-        print(f"Model saved to: {self.model_path}")
-        
-        # Sample code to load the model
-        print("\nTo load and use the model:")
-        print("```python")
-        print("import pickle")
-        print("with open('path/to/mnist_model.pkl', 'rb') as f:")
-        print("    model = pickle.load(f)")
-        print("# Use the model for predictions")
-        print("model.eval()")
-        print("with torch.no_grad():")
-        print("    predictions = model(your_data)")
-        print("```")
-        
-        print("\nTo run this flow with custom parameters:")
-        print("python mnist_flow.py run --epochs 5 --batch_size 64 --learning_rate 0.005 --hidden_size 256")
+        print("🎉 Flujo de trabajo completado.")
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     MNISTFlow()
