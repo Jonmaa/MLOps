@@ -48,11 +48,11 @@ jobs:
       - name: Entrenar modelo con MLflow
         run: python mlflowMain.py      
 
-      - name: Guardar modelo (solo si se entrena correctamente)
+      - name: Guardar modelo 
         uses: actions/upload-artifact@v4
         with:
           name: mnist-model
-          path: modelo_entrenado.pkl
+          path: modelo_entrenado_mlflow.pkl
       
       - name: Descargar el modelo entrenado
         uses: actions/download-artifact@v4
@@ -82,3 +82,9 @@ jobs:
 
       - name: Ejecutar otro script
         run: python metaflowMain.py
+
+      - name: Guardar modelo 
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnist-model
+          path: modelo_entrenado_metaflow.pkl

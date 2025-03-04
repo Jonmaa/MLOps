@@ -11,7 +11,7 @@ import pickle
 
 # Cargar datos MNIST
 batch_size = 64
-lr = 0.01
+lr = 0.001
 transform = transforms.Compose([transforms.ToTensor()])
 train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
