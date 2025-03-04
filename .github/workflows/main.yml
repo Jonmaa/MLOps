@@ -51,7 +51,7 @@ jobs:
       - name: Guardar modelo 
         uses: actions/upload-artifact@v4
         with:
-          name: mnist-model
+          name: mnist-model-mlflow
           path: modelo_entrenado_mlflow.pkl
       
       - name: Descargar el modelo entrenado
@@ -86,5 +86,5 @@ jobs:
       - name: Guardar modelo 
         uses: actions/upload-artifact@v4
         with:
-          name: mnist-model
+          name: mnist-model-metaflow
           path: modelo_entrenado_metaflow.pkl
