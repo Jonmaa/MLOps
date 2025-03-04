@@ -115,12 +115,12 @@ class MNISTFlow(FlowSpec):
     @step
     def save_model(self):
         print("💾 Guardando modelo entrenado...")
-        with open("modelo_entrenado.pkl", "wb") as f:
+        with open("modelo_entrenado_metaflow.pkl", "wb") as f:
             pickle.dump(self.model, f)
         print("✅ Modelo guardado correctamente.")
         self.next(self.evaluate_model)
     
-    @card
+#    @card
     @step
     def evaluate_model(self):
        print("📊 Evaluando el modelo...")
@@ -145,31 +145,31 @@ class MNISTFlow(FlowSpec):
        print(f"✅ Precisión del modelo: {accuracy * 100:.2f}%")
 
        # Seleccionar 10 imágenes del test
-       num_samples = 10
-       sample_images = test_images[:num_samples]
-       sample_labels = all_labels[:num_samples]
-       sample_preds = all_preds[:num_samples]
+#       num_samples = 10
+#       sample_images = test_images[:num_samples]
+#       sample_labels = all_labels[:num_samples]
+#       sample_preds = all_preds[:num_samples]
 
        # Crear la figura
-       fig, axes = plt.subplots(1, num_samples, figsize=(15, 3))
-       for i, ax in enumerate(axes):
-           ax.imshow(sample_images[i].squeeze(), cmap='gray')
-           ax.set_title(f"Pred: {sample_preds[i]}\nReal: {sample_labels[i]}")
-           ax.axis("off")
+#       fig, axes = plt.subplots(1, num_samples, figsize=(15, 3))
+#       for i, ax in enumerate(axes):
+#           ax.imshow(sample_images[i].squeeze(), cmap='gray')
+#           ax.set_title(f"Pred: {sample_preds[i]}\nReal: {sample_labels[i]}")
+#           ax.axis("off")
 
        # Guardar la imagen en un buffer
-       buffer = io.BytesIO()
-       plt.savefig(buffer, format='png')
-       buffer.seek(0)
-       plt.close()
+#       buffer = io.BytesIO()
+#       plt.savefig(buffer, format='png')
+#       buffer.seek(0)
+#       plt.close()
 
        # Convertir la imagen en Base64
-       import base64
-       img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+#       import base64
+#       img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
 
        # Agregar la imagen a la card de Metaflow
-       current.card.append(f'<h3>🔍 Ejemplos de predicciones</h3>')
-       current.card.append(f'<img src="data:image/png;base64,{img_base64}" width="800"/>')
+#       current.card.append(f'<h3>🔍 Ejemplos de predicciones</h3>')
+#       current.card.append(f'<img src="data:image/png;base64,{img_base64}" width="800"/>')
 
        print("📸 Predicciones visualizadas en la card de Metaflow")
        self.next(self.end)
