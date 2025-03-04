@@ -5,3 +5,4 @@ numpy
 metaflow
 opentelemetry-exporter-otlp
 seaborn
+pylint
