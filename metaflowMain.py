@@ -74,7 +74,7 @@ class DeepNN(nn.Module):
 
 class MNISTFlow(FlowSpec):
     
-    batch_size = Parameter('batch_size', default=64, help='Tamaño del batch')
+    batch_size = Parameter('batch_size', default=128, help='Tamaño del batch')
     lr = Parameter('learning_rate', default=0.01, help='Tasa de aprendizaje')
     epochs = Parameter('epochs', default=5, help='Número de épocas')
     
