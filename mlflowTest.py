@@ -12,7 +12,7 @@ test_dataset = datasets.MNIST(root='./data', train=False, transform=transform, d
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 # Cargar el modelo entrenado desde MLflow
-with open("modelo_entrenado.pkl", "rb") as f:
+with open("modelo_entrenado_mlflow.pkl", "rb") as f:
     model = pickle.load(f)
 model.eval()
 
