@@ -59,7 +59,36 @@ Una vez en la página podremos ejecutar nuestro archivo dándole a un botón y s
 >[!IMPORTANT]
 Para poder ejecutar airflowMain.py es necesario instalar las siguientes dependencias: pip install datasets torch transformers
 
+## 5. Kubeflow pipelines
+En este caso se implementa un modelo de IA que se encarga de analizar si las reviews de unos usuarios sobre películas son positivas o negativas. Se hace uso del conjunto de datos de IMDB de Hugging Face y para analizar los sentimientos se hace uso de un modelo DistilBERT pre-entrenado para analizar los sentimientos en reseñas.
 
+### 5.1 Pasos a seguir para ejecutar
+- Instalar Minikube e iniciarlo con recursos mínimos para kubeflow
+```bash
+minikube start --cpus=4 --memory=8192
+```
+- Instalar kubeflow en minikube
+```bash
+kubectl apply -k "github.com/kubeflow/pipelines/manifests/kustomize/cluster-scoped-resources?ref=1.8.0"
+```
+```bash
+kubectl apply -k "github.com/kubeflow/pipelines/manifests/kustomize/env/platform-agnostic-pns?ref=1.8.0"
+```
+- Esperar a que todos los pods de kubeflow se encuentren en ejecución, se pueden mirar con el siguiente comando
+```bash
+kubectl get pods -n kubeflow
+```
+- Una vez todos estén en ejecución se puede hacer port-forwarding para abrir la interfaz de usuario
+```bash
+kubectl port-forward -n kubeflow svc/ml-pipeline-ui 8080:80
+```
+- Ahora se puede acceder a ella a través de localhost:8080
+- Para poder realizar una run en kubeflow pipelines, primero se ha de importar el YAML, para ello se ejecuta el archivo de kubeflowMain.py
+- Eso generará un .yaml, que será lo se sube en el apartado de pipelines de kubeflow, dándole a seleccionar archivo.
+- Por último se va al apartado de runs, se crea una nueva con la pipeline recién importada y se le da un nombre a la ejecución, en el momento en que guarde se podrá visualizar como se ejecuta.
+
+>[!IMPORTANT]
+Para poder ejecutar kubeflowMain.py es necesario instalar las siguientes dependencias (se recomienda que se instalen en un env personalizado): pip install kfp==1.8.9 datasets pandas transformers torch scikit-learn
 
 ## Pipeline
 
