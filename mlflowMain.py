@@ -146,8 +146,4 @@ with mlflow.start_run():
     )
 
 
-    # Guardar modelo localmente también
-    #with open("modelo_entrenado_mlflow.pkl", "wb") as f:
-    #    pickle.dump(model, f)
-
 print("✅ Entrenamiento finalizado y modelo registrado en MLflow.")
