@@ -7,7 +7,6 @@ import mlflow
 import mlflow.pytorch
 from mlflow.models import infer_signature
 import numpy as np
-import pickle
 import time
 from mlflow.tracking import MlflowClient
 
@@ -86,7 +85,7 @@ class CNN_Model(nn.Module): # Modelo de red convolucional para mejorar los patro
         return x
 
 
-model = SimpleNN()
+model = CNN_Model()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 criterion = nn.CrossEntropyLoss()
 
@@ -148,7 +147,7 @@ with mlflow.start_run():
 
 
     # Guardar modelo localmente también
-    with open("modelo_entrenado_mlflow.pkl", "wb") as f:
-        pickle.dump(model, f)
+    #with open("modelo_entrenado_mlflow.pkl", "wb") as f:
+    #    pickle.dump(model, f)
 
 print("✅ Entrenamiento finalizado y modelo registrado en MLflow.")

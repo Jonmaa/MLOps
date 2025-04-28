@@ -12,6 +12,7 @@ mlflow.set_experiment("MNIST-Classification")
 
 # Carga el último modelo registrado en MLflow
 model = mlflow.pytorch.load_model("models:/MNIST-Classifier/Production")
+print("🔄 Modelo cargado desde MLflow.", model)
 
 model.eval()
 

@@ -6,6 +6,4 @@ metaflow
 opentelemetry-exporter-otlp
 seaborn
 pylint
-time
-pickle
 numpy
