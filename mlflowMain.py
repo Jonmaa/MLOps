@@ -8,6 +8,8 @@ import mlflow.pytorch
 from mlflow.models import infer_signature
 import numpy as np
 import time
+import tempfile
+import os
 from mlflow.tracking import MlflowClient
 
 
@@ -85,7 +87,7 @@ class CNN_Model(nn.Module): # Modelo de red convolucional para mejorar los patro
         return x
 
 
-model = CNN_Model()
+model = DeepNN()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 criterion = nn.CrossEntropyLoss()
 
@@ -122,9 +124,12 @@ with mlflow.start_run():
     
     # Generar la firma del modelo automáticamente
     signature = infer_signature(example_input.numpy(), example_output.detach().numpy())
+
+    with tempfile.TemporaryDirectory() as artifact_dir:
+        mlflow.pytorch.log_model(model, "mnist_model", signature=signature, input_example=example_input_numpy, artifact_path=artifact_dir)
     
     # Guardar el modelo con firma y ejemplo de entrada
-    mlflow.pytorch.log_model(model, "mnist_model", signature=signature, input_example=example_input_numpy)
+    #mlflow.pytorch.log_model(model, "mnist_model", signature=signature, input_example=example_input_numpy)
 
     # Crear un cliente de MLflow
     client = MlflowClient()
