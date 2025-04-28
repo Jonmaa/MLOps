@@ -8,6 +8,9 @@ import mlflow.pytorch
 from mlflow.models import infer_signature
 import numpy as np
 import pickle
+import time
+from mlflow.tracking import MlflowClient
+
 
 # Cargar datos MNIST
 batch_size = 64
@@ -87,6 +90,9 @@ model = SimpleNN()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 criterion = nn.CrossEntropyLoss()
 
+# Configuración del servidor de seguimiento de MLflow
+mlflow.set_tracking_uri("http://167.99.84.228:5000") 
+
 # Iniciar experimento en MLflow
 mlflow.set_experiment("MNIST-Classification")
 
@@ -120,6 +126,26 @@ with mlflow.start_run():
     
     # Guardar el modelo con firma y ejemplo de entrada
     mlflow.pytorch.log_model(model, "mnist_model", signature=signature, input_example=example_input_numpy)
+
+    # Crear un cliente de MLflow
+    client = MlflowClient()
+
+    # Registrar el modelo en el Model Registry
+    result = mlflow.register_model(
+        model_uri=f"runs:/{mlflow.active_run().info.run_id}/mnist_model",  # mnist_model es el artifact_path
+        name="MNIST-Classifier"  
+    )
+
+    # Esperar unos segundos porque a veces el backend tarda un poco en registrar
+    time.sleep(10)
+
+    # Promocionar el modelo registrado a 'Production'
+    client.transition_model_version_stage(
+        name="MNIST-Classifier",
+        version=result.version,
+        stage="Production"
+    )
+
 
     # Guardar modelo localmente también
     with open("modelo_entrenado_mlflow.pkl", "wb") as f:

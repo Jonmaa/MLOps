@@ -3,18 +3,22 @@ import torch.nn as nn
 from torchvision import datasets, transforms
 import mlflow
 import mlflow.pytorch
-import pickle
-from mlflowMain import SimpleNN, DeepNN, CNN_Model
+
+# ⬇️ Configura conexión a tu servidor MLflow
+mlflow.set_tracking_uri("http://167.99.84.228:5000")
+
+# ⬇️ Selecciona el experimento
+mlflow.set_experiment("MNIST-Classification")  
+
+# Carga el último modelo registrado en MLflow
+model = mlflow.pytorch.load_model("models:/MNIST-Classifier/Production")
+
+model.eval()
 
 # Cargar datos de test MNIST
 transform = transforms.Compose([transforms.ToTensor()])
 test_dataset = datasets.MNIST(root='./data', train=False, transform=transform, download=True)
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=False)
-
-# Cargar el modelo entrenado desde MLflow
-with open("modelo_entrenado_mlflow.pkl", "rb") as f:
-    model = pickle.load(f)
-model.eval()
 
 # Evaluación del modelo
 correct = 0
@@ -37,9 +41,7 @@ test_loss /= len(test_loader)
 print(f"🔍 Precisión en test: {accuracy:.2f}%")
 print(f"🎯 Pérdida en test: {test_loss:.4f}")
 
-# Registrar métricas en MLflow
-mlflow.set_experiment("MNIST-Classification")
-
+# Registrar métricas de test en MLflow
 with mlflow.start_run():
     mlflow.log_metric("test_accuracy", accuracy)
     mlflow.log_metric("test_loss", test_loss)
@@ -47,6 +49,6 @@ with mlflow.start_run():
 # Falla si la precisión es menor al 90%
 if accuracy < 90:
     print("❌ Precisión demasiado baja. Fallando el workflow.")
-    #exit(1)  # Detiene GitHub Actions
+    #exit(1)
 else:
     print("✅ Test aprobado. Modelo validado.")
