@@ -44,8 +44,23 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+      
+      - name: Create temporary directories with proper permissions
+        run: |
+          mkdir -p /tmp/mlflow-data
+          chmod 777 /tmp/mlflow-data
+          echo "Created temporary directory with full permissions"
 
       - name: Entrenar modelo con MLflow
+        env:
+          MLFLOW_TRACKING_URI: "http://167.99.84.228:5000"
+          MLFLOW_TRACKING_DIR: "/tmp/mlflow-data/tracking"
+          MLFLOW_ARTIFACTS_DESTINATION: "/tmp/mlflow-data/artifacts"
+          MLFLOW_ROOT_ARTIFACT_URI: "/tmp/mlflow-data/root-artifacts"
+          MLFLOW_ARTIFACT_ROOT: "/tmp/mlflow-data/artifacts-root" 
+          MLFLOW_RUN_ARTIFACT_ROOT: "/tmp/mlflow-data/run-artifacts"
+          MLFLOW_REGISTRY_URI: "/tmp/mlflow-data/registry"
+          TMPDIR: "/tmp/mlflow-data"
         run: python mlflowMain.py      
 
       - name: Evaluar modelo con MLflow

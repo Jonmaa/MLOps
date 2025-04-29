@@ -15,20 +15,45 @@ import sys
 from pathlib import Path
 from mlflow.tracking import MlflowClient
 
+# Add at top of script for debugging
+import os
+print("===== ENVIRONMENT VARIABLES =====")
+for key, value in sorted(os.environ.items()):
+    if "MLFLOW" in key:
+        print(f"{key}: {value}")
+print("================================")
+
 # ===== CONFIGURACIÓN PARA EVITAR PROBLEMAS DE PERMISOS =====
 # 1. Usar directorios temporales accesibles en Github Actions
 temp_dir = tempfile.mkdtemp()  # Crear directorio temporal con permisos correctos
+print(f"🔧 Directorio temporal creado: {temp_dir}")
 
-# 2. Establecer variables de entorno para evitar uso de directories protegidos
+# 2. Establecer variables de entorno críticas para MLflow
 os.environ["MLFLOW_TRACKING_DIR"] = os.path.join(temp_dir, "mlflow-tracking")
 os.environ["MLFLOW_ARTIFACTS_DESTINATION"] = os.path.join(temp_dir, "mlflow-artifacts")
+os.environ["MLFLOW_REGISTRY_URI"] = os.path.join(temp_dir, "mlflow-registry")
 
-# 3. Crear directorios locales para artefactos y asegurar que existen
-artifact_path = Path(os.environ["MLFLOW_ARTIFACTS_DESTINATION"])
-artifact_path.mkdir(parents=True, exist_ok=True)
+# Variables específicas para evitar el uso de /root/artifacts
+os.environ["MLFLOW_ROOT_ARTIFACT_URI"] = os.path.join(temp_dir, "mlflow-root-artifacts")
+os.environ["MLFLOW_ARTIFACT_ROOT"] = os.path.join(temp_dir, "mlflow-artifacts")
+os.environ["MLFLOW_RUN_ARTIFACT_ROOT"] = os.path.join(temp_dir, "mlflow-run-artifacts")
 
-tracking_path = Path(os.environ["MLFLOW_TRACKING_DIR"])
-tracking_path.mkdir(parents=True, exist_ok=True)
+# 3. Crear todos los directorios necesarios
+for dir_path in [
+    os.environ["MLFLOW_TRACKING_DIR"],
+    os.environ["MLFLOW_ARTIFACTS_DESTINATION"],
+    os.environ["MLFLOW_REGISTRY_URI"],
+    os.environ["MLFLOW_ROOT_ARTIFACT_URI"],
+    os.environ["MLFLOW_ARTIFACT_ROOT"],
+    os.environ["MLFLOW_RUN_ARTIFACT_ROOT"]
+]:
+    Path(dir_path).mkdir(parents=True, exist_ok=True)
+    print(f"📁 Creado directorio: {dir_path}")
+
+# Establecer directorio para mlruns que es donde MLflow guarda por defecto
+mlruns_dir = os.path.join(temp_dir, "mlruns")
+Path(mlruns_dir).mkdir(parents=True, exist_ok=True)
+print(f"📁 Creado directorio mlruns: {mlruns_dir}")
 
 # 4. Imprimir información para diagnóstico
 print(f"🔧 Directorio configurado para artefactos: {artifact_path}")
@@ -82,6 +107,11 @@ try:
     # Configuración del servidor de seguimiento de MLflow
     mlflow.set_tracking_uri("http://167.99.84.228:5000") 
     print("🔌 Conectado a servidor MLflow")
+    
+    # Configurar ubicación de artefactos
+    mlflow.pytorch.PYTORCH_AUTOLOG_ARTIFACTS_PATH = os.path.join(temp_dir, "pytorch-artifacts")
+    Path(mlflow.pytorch.PYTORCH_AUTOLOG_ARTIFACTS_PATH).mkdir(parents=True, exist_ok=True)
+    print(f"📁 Configurado directorio para artefactos PyTorch: {mlflow.pytorch.PYTORCH_AUTOLOG_ARTIFACTS_PATH}")
 
     # Iniciar experimento
     mlflow.set_experiment("MNIST-Classification")
@@ -149,10 +179,19 @@ try:
         )
         
         # Guardar modelo en MLflow utilizando mlflow.pytorch.log_model
-        # que gestionará mejor los permisos al enviar al servidor remoto
+        # con ruta explícita para artefactos
+        artifact_path = "mnist_model"
+        artifact_local_path = os.path.join(temp_dir, artifact_path)
+        Path(artifact_local_path).mkdir(parents=True, exist_ok=True)
+        
+        # Primero guardar el modelo en un directorio local
+        torch.save(model.state_dict(), os.path.join(artifact_local_path, "model.pth"))
+        print(f"💾 Modelo guardado en directorio temporal: {artifact_local_path}")
+        
+        # Ahora registrar en MLflow
         mlflow.pytorch.log_model(
             model, 
-            "mnist_model",
+            artifact_path,
             signature=signature,
             input_example=example_input.numpy(),
             registered_model_name="MNIST-Classifier"
