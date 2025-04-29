@@ -176,6 +176,7 @@ with mlflow.start_run() as run:
         stage="Production"
     )
 
+
 print("✅ Entrenamiento, logueo y registro finalizado.")
 
 artifact_uri = mlflow.get_artifact_uri()
