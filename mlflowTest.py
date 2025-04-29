@@ -3,6 +3,7 @@ from torchvision import datasets, transforms
 import mlflow
 import mlflow.pyfunc
 import pandas as pd
+from sklearn.metrics import classification_report
 import torch.nn as nn
 
 # Conectar con el servidor MLflow
@@ -23,6 +24,8 @@ correct = 0
 total = 0
 criterion = nn.CrossEntropyLoss()
 test_loss = 0
+all_labels = []
+all_preds  = []
 
 with torch.no_grad():
     for images, labels in test_loader:
@@ -37,6 +40,8 @@ with torch.no_grad():
         test_loss += loss.item()
         
         _, predicted = torch.max(outputs_tensor, 1)
+        all_labels.extend(labels.numpy().tolist())
+        all_preds.extend(predicted.numpy().tolist())
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 
@@ -46,13 +51,12 @@ test_loss /= len(test_loader)
 print(f"🔍 Precisión en test: {accuracy:.2f}%")
 print(f"🎯 Pérdida en test: {test_loss:.4f}")
 
+report = classification_report(all_labels, all_preds, output_dict=True)
 # Registrar métricas
 with mlflow.start_run():
     mlflow.log_metric("test_accuracy", accuracy)
-    mlflow.log_metric("test_loss", test_loss)
-
-    from sklearn.metrics import classification_report
-    report = classification_report(labels.numpy(), predicted.numpy(), output_dict=True)
+    mlflow.log_metric("test_loss", test_loss)  
+    
     for class_label, metrics in report.items():
         if isinstance(metrics, dict):  # Ignorar las métricas globales
             mlflow.log_metric(f"precision_class_{class_label}", metrics["precision"])
