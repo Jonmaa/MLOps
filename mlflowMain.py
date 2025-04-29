@@ -24,8 +24,9 @@ class PyTorchWrapper(mlflow.pyfunc.PythonModel):
 
 
 # Datos
-batch_size = 64
-lr = 0.001
+batch_size = 32
+lr = 0.01
+num_epochs = 10
 transform = transforms.Compose([transforms.ToTensor()])
 train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -97,7 +98,7 @@ class CNN_Model(nn.Module): # Modelo de red convolucional para mejorar los patro
         return x
 
 
-model = CNN_Model()
+model = DeepNN()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 criterion = nn.CrossEntropyLoss()
 
@@ -110,9 +111,11 @@ mlflow.set_experiment("MNIST-Classification")
 with mlflow.start_run() as run:
     mlflow.log_param("learning_rate", lr)
     mlflow.log_param("batch_size", batch_size)
+    mlflow.log_param("num_epochs", num_epochs)
+    mlflow.log_param("dataset_size", len(train_dataset))
 
     # Entrenamiento
-    for epoch in range(5):
+    for epoch in range(num_epochs):
         total_loss = 0
         for images, labels in train_loader:
             optimizer.zero_grad()
