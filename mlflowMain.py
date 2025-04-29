@@ -97,7 +97,7 @@ class CNN_Model(nn.Module): # Modelo de red convolucional para mejorar los patro
         return x
 
 
-model = SimpleNN()
+model = CNN_Model()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 criterion = nn.CrossEntropyLoss()
 
