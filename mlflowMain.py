@@ -16,16 +16,23 @@ from pathlib import Path
 from mlflow.tracking import MlflowClient
 
 # ===== CONFIGURACIÓN PARA EVITAR PROBLEMAS DE PERMISOS =====
-# 1. Establecer variables de entorno para prevenir uso de directories protegidos
-os.environ["MLFLOW_TRACKING_DIR"] = "/tmp/mlflow-tracking"
-os.environ["MLFLOW_ARTIFACTS_DESTINATION"] = "/tmp/mlflow-artifacts"
+# 1. Usar directorios temporales accesibles en Github Actions
+temp_dir = tempfile.mkdtemp()  # Crear directorio temporal con permisos correctos
 
-# 2. Crear directorio local para artefactos y asegurar que existe
-artifact_path = Path("/tmp/mlflow-artifacts")
+# 2. Establecer variables de entorno para evitar uso de directories protegidos
+os.environ["MLFLOW_TRACKING_DIR"] = os.path.join(temp_dir, "mlflow-tracking")
+os.environ["MLFLOW_ARTIFACTS_DESTINATION"] = os.path.join(temp_dir, "mlflow-artifacts")
+
+# 3. Crear directorios locales para artefactos y asegurar que existen
+artifact_path = Path(os.environ["MLFLOW_ARTIFACTS_DESTINATION"])
 artifact_path.mkdir(parents=True, exist_ok=True)
 
-# 3. Imprimir información para diagnóstico
+tracking_path = Path(os.environ["MLFLOW_TRACKING_DIR"])
+tracking_path.mkdir(parents=True, exist_ok=True)
+
+# 4. Imprimir información para diagnóstico
 print(f"🔧 Directorio configurado para artefactos: {artifact_path}")
+print(f"🔧 Directorio para tracking: {tracking_path}")
 print(f"🔧 Usuario actual: {os.getuid()}")
 
 # ===== CONFIGURACIÓN DEL MODELO Y DATOS =====
@@ -35,7 +42,7 @@ lr = 0.001
 transform = transforms.Compose([transforms.ToTensor()])
 
 try:
-    train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
+    train_dataset = datasets.MNIST(root=os.path.join(temp_dir, 'data'), train=True, transform=transform, download=True)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     print("✅ Datos MNIST cargados correctamente")
 except Exception as e:
@@ -80,8 +87,8 @@ try:
     mlflow.set_experiment("MNIST-Classification")
     print("📊 Experimento configurado")
 
-    # Guardar modelo en local primero
-    local_model_dir = Path("/tmp/mlflow-model-local")
+    # Guardar modelo en local primero (en directorio temporal)
+    local_model_dir = Path(os.path.join(temp_dir, "mlflow-model-local"))
     local_model_dir.mkdir(parents=True, exist_ok=True)
     
     with mlflow.start_run() as run:
@@ -141,7 +148,8 @@ try:
             example_output.detach().numpy()
         )
         
-        # Guardar modelo en MLflow
+        # Guardar modelo en MLflow utilizando mlflow.pytorch.log_model
+        # que gestionará mejor los permisos al enviar al servidor remoto
         mlflow.pytorch.log_model(
             model, 
             "mnist_model",
