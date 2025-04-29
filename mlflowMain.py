@@ -154,14 +154,17 @@ with mlflow.start_run():
     # Añadir descripción al modelo y su versión
     client.update_registered_model(
         name="MNIST-Classifier",
-        description="Clasificador de dígitos MNIST entrenado con " + model.__class__.__name__ + "."
+        description="Clasificador de dígitos MNIST entrenado con distintas arquitecturas de red neuronal."
     )
 
-    # client.update_model_version(
-    #     name="MNIST-Classifier",
-    #     version=result.version,
-    #     description="Versión entrenada durante 5 épocas con arquitectura DeepNN. Optimizer: Adam, LR: 0.001."
-    # )
+    client.update_model_version(
+        name="MNIST-Classifier",
+        version=result.version,
+        description=(
+            f"Versión entrenada durante 5 épocas con arquitectura {model.__class__.__name__}. "
+            f"Optimizer: {optimizer.__class__.__name__}, Learning Rate: {lr}, Batch Size: {batch_size}."
+        )
+    )
 
     # Promocionar a producción
     client.transition_model_version_stage(
