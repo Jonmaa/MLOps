@@ -8,8 +8,6 @@ import mlflow.pytorch
 from mlflow.models import infer_signature
 import numpy as np
 import time
-import tempfile
-import os
 
 from mlflow.tracking import MlflowClient
 
