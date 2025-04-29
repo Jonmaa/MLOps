@@ -178,3 +178,6 @@ with mlflow.start_run() as run:
     #)
 
 print("✅ Entrenamiento, logueo y registro finalizado.")
+
+artifact_uri = mlflow.get_artifact_uri()
+print(f"📂 Los artefactos se han guardado en: {artifact_uri}")
