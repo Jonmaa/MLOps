@@ -101,6 +101,8 @@ model = SimpleNN()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 criterion = nn.CrossEntropyLoss()
 
+#test
+
 # MLflow config
 mlflow.set_tracking_uri("http://167.99.84.228:5000")
 mlflow.set_experiment("MNIST-Classification")
