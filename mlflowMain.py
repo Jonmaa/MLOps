@@ -127,24 +127,47 @@ with mlflow.start_run():
     # Guardar el modelo con firma y ejemplo de entrada
     mlflow.pytorch.log_model(model, "mnist_model", signature=signature, input_example=example_input_numpy)
 
-    # Crear un cliente de MLflow
-    client = MlflowClient()
+    # Guardar número de parámetros como métrica adicional
+    num_params = sum(p.numel() for p in model.parameters())
+    mlflow.log_metric("num_parameters", num_params)
+
+    # Guardar el propio script como artefacto
+    mlflow.log_artifact(__file__)  # Guarda el script actual
+
+    # Añadir tags útiles para clasificar
+    mlflow.set_tag("model_type", model.__class__.__name__)  
+    mlflow.set_tag("dataset", "MNIST")
+    mlflow.set_tag("framework", "PyTorch")
 
     # Registrar el modelo en el Model Registry
     result = mlflow.register_model(
-        model_uri=f"runs:/{mlflow.active_run().info.run_id}/mnist_model",  # mnist_model es el artifact_path
-        name="MNIST-Classifier"  
+        model_uri=f"runs:/{mlflow.active_run().info.run_id}/mnist_model",
+        name="MNIST-Classifier"
     )
 
-    # Esperar unos segundos porque a veces el backend tarda un poco en registrar
+    # Esperar unos segundos porque el backend puede tardar en reflejar el cambio
     time.sleep(10)
 
-    # Promocionar el modelo registrado a 'Production'
+    # Crear cliente MLflow
+    client = MlflowClient()
+
+    # Añadir descripción al modelo y su versión
+    client.update_registered_model(
+        name="MNIST-Classifier",
+        description="Clasificador de dígitos MNIST entrenado con " + model.__class__.__name__ + "."
+    )
+
+    # client.update_model_version(
+    #     name="MNIST-Classifier",
+    #     version=result.version,
+    #     description="Versión entrenada durante 5 épocas con arquitectura DeepNN. Optimizer: Adam, LR: 0.001."
+    # )
+
+    # Promocionar a producción
     client.transition_model_version_stage(
         name="MNIST-Classifier",
         version=result.version,
         stage="Production"
     )
-
 
 print("✅ Entrenamiento finalizado y modelo registrado en MLflow.")
