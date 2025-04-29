@@ -13,8 +13,6 @@ import os
 
 from mlflow.tracking import MlflowClient
 
-temp_artifact_dir = tempfile.mkdtemp()
-os.environ["MLFLOW_ARTIFACTS_DESTINATION"] = temp_artifact_dir
 
 # Cargar datos MNIST
 batch_size = 64
