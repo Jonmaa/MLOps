@@ -170,11 +170,11 @@ with mlflow.start_run() as run:
             f"y parámetros: learning rate={lr}, batch size={batch_size}, optimizador " + optimizer.__class__.__name__ 
         )
     )
-    #client.transition_model_version_stage(
-    #    name="MNIST-Classifier",
-    #    version=result.version,
-    #    stage="Production"
-    #)
+    client.transition_model_version_stage(
+        name="MNIST-Classifier",
+        version=result.version,
+        stage="Production"
+    )
 
 print("✅ Entrenamiento, logueo y registro finalizado.")
 
