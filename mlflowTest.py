@@ -51,6 +51,14 @@ with mlflow.start_run():
     mlflow.log_metric("test_accuracy", accuracy)
     mlflow.log_metric("test_loss", test_loss)
 
+    from sklearn.metrics import classification_report
+    report = classification_report(labels.numpy(), predicted.numpy(), output_dict=True)
+    for class_label, metrics in report.items():
+        if isinstance(metrics, dict):  # Ignorar las métricas globales
+            mlflow.log_metric(f"precision_class_{class_label}", metrics["precision"])
+            mlflow.log_metric(f"recall_class_{class_label}", metrics["recall"])
+            mlflow.log_metric(f"f1_score_class_{class_label}", metrics["f1-score"])
+
 # Validación automática
 if accuracy < 90:
     print("❌ Precisión demasiado baja. Fallando el workflow.")
