@@ -10,30 +10,39 @@ import numpy as np
 import time
 import tempfile
 import os
-
+import uuid
+import sys
+from pathlib import Path
 from mlflow.tracking import MlflowClient
 
+# ===== CONFIGURACIÓN PARA EVITAR PROBLEMAS DE PERMISOS =====
+# 1. Establecer variables de entorno para prevenir uso de directories protegidos
+os.environ["MLFLOW_TRACKING_DIR"] = "/tmp/mlflow-tracking"
+os.environ["MLFLOW_ARTIFACTS_DESTINATION"] = "/tmp/mlflow-artifacts"
 
+# 2. Crear directorio local para artefactos y asegurar que existe
+artifact_path = Path("/tmp/mlflow-artifacts")
+artifact_path.mkdir(parents=True, exist_ok=True)
+
+# 3. Imprimir información para diagnóstico
+print(f"🔧 Directorio configurado para artefactos: {artifact_path}")
+print(f"🔧 Usuario actual: {os.getuid()}")
+
+# ===== CONFIGURACIÓN DEL MODELO Y DATOS =====
 # Cargar datos MNIST
 batch_size = 64
 lr = 0.001
 transform = transforms.Compose([transforms.ToTensor()])
-train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-# Definición del modelo
-class SimpleNN(nn.Module):
-    def __init__(self):
-        super(SimpleNN, self).__init__()
-        self.fc1 = nn.Linear(28*28, 128)
-        self.fc2 = nn.Linear(128, 10) # 10 salidas diferentes, una por cada dígito (0-9)
+try:
+    train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    print("✅ Datos MNIST cargados correctamente")
+except Exception as e:
+    print(f"❌ Error al cargar datos MNIST: {e}")
+    sys.exit(1)
 
-    def forward(self, x):
-        x = x.view(-1, 28*28) # Aplanar la imagen a un vector de 784 valores
-        x = torch.relu(self.fc1(x)) # Relu como función de activación
-        x = self.fc2(x)
-        return x
-
+# Definición del modelo - Usamos DeepNN que es más compleja y tiene mejor rendimiento
 class DeepNN(nn.Module):
     def __init__(self):
         super(DeepNN, self).__init__()
@@ -42,7 +51,6 @@ class DeepNN(nn.Module):
         self.fc3 = nn.Linear(256, 128)
         self.fc4 = nn.Linear(128, 64)
         self.fc5 = nn.Linear(64, 10)
-
         self.dropout = nn.Dropout(p=0.3)
 
     def forward(self, x):
@@ -58,95 +66,108 @@ class DeepNN(nn.Module):
         x = self.fc5(x)
         return x
 
+# ===== ENTRENAMIENTO Y REGISTRO DEL MODELO =====
+try:
+    model = DeepNN()
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    criterion = nn.CrossEntropyLoss()
 
-class CNN_Model(nn.Module): # Modelo de red convolucional para mejorar los patrones de las imágenes
-    def __init__(self):
-        super(CNN_Model, self).__init__()
-        
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(64)
-        
-        self.pool = nn.MaxPool2d(2, 2)  # Reduce el tamaño a la mitad
-        
-        self.fc1 = nn.Linear(64 * 7 * 7, 128)
-        self.fc2 = nn.Linear(128, 10)
-        
-        self.dropout = nn.Dropout(0.3)
+    # Configuración del servidor de seguimiento de MLflow
+    mlflow.set_tracking_uri("http://167.99.84.228:5000") 
+    print("🔌 Conectado a servidor MLflow")
 
-    def forward(self, x):
-        x = torch.relu(self.bn1(self.conv1(x)))
-        x = self.pool(x)
-        x = torch.relu(self.bn2(self.conv2(x)))
-        x = self.pool(x)
-        
-        x = x.view(-1, 64 * 7 * 7)  # Aplanar antes de pasar a las capas densas
-        x = torch.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
-        return x
+    # Iniciar experimento
+    mlflow.set_experiment("MNIST-Classification")
+    print("📊 Experimento configurado")
 
-
-model = DeepNN()
-optimizer = optim.Adam(model.parameters(), lr=lr)
-criterion = nn.CrossEntropyLoss()
-
-# Configuración del servidor de seguimiento de MLflow
-mlflow.set_tracking_uri("http://167.99.84.228:5000") 
-
-# Iniciar experimento en MLflow
-mlflow.set_experiment("MNIST-Classification")
-
-with mlflow.start_run():
-    # Registrar hiperparámetros
-    mlflow.log_param("learning_rate", lr)
-    mlflow.log_param("batch_size", batch_size)
-
-    # Entrenar modelo
-    for epoch in range(5):
-        total_loss = 0
-        for images, labels in train_loader:
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
-        
-        avg_loss = total_loss / len(train_loader)
-        mlflow.log_metric("training_loss", avg_loss, step=epoch)
-        print(f"🔄 Epoch {epoch+1}, Loss: {avg_loss:.4f}")
-
-    # Crear un ejemplo de entrada (un batch de imágenes aleatorias)
-    example_input = torch.randn(4, 1, 28, 28)
-    example_input_numpy = example_input.numpy()  # Convertirlo a numpy porque no acepta el formato torch.Tensor
-    example_output = model(example_input) 
+    # Guardar modelo en local primero
+    local_model_dir = Path("/tmp/mlflow-model-local")
+    local_model_dir.mkdir(parents=True, exist_ok=True)
     
-    # Generar la firma del modelo automáticamente
-    signature = infer_signature(example_input.numpy(), example_output.detach().numpy())
-    
-    # Guardar el modelo con firma y ejemplo de entrada
-    mlflow.pytorch.log_model(model, "mnist_model", signature=signature, input_example=example_input_numpy)
+    with mlflow.start_run() as run:
+        print(f"🏃 Iniciando ejecución MLflow: {run.info.run_id}")
+        
+        # Registrar hiperparámetros
+        mlflow.log_param("learning_rate", lr)
+        mlflow.log_param("batch_size", batch_size)
+        mlflow.log_param("model_type", "DeepNN")
 
-    # Crear un cliente de MLflow
-    client = MlflowClient()
+        # Entrenamiento
+        for epoch in range(5):
+            total_loss = 0
+            correct = 0
+            total = 0
+            
+            for images, labels in train_loader:
+                optimizer.zero_grad()
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+                
+                # Calcular precisión durante entrenamiento
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+                
+                total_loss += loss.item()
+            
+            # Métricas por época
+            avg_loss = total_loss / len(train_loader)
+            accuracy = 100 * correct / total
+            
+            # Registrar métricas
+            mlflow.log_metric("training_loss", avg_loss, step=epoch)
+            mlflow.log_metric("training_accuracy", accuracy, step=epoch)
+            
+            print(f"🔄 Epoch {epoch+1}, Loss: {avg_loss:.4f}, Accuracy: {accuracy:.2f}%")
 
-    # Registrar el modelo en el Model Registry
-    result = mlflow.register_model(
-        model_uri=f"runs:/{mlflow.active_run().info.run_id}/mnist_model",  # mnist_model es el artifact_path
-        name="MNIST-Classifier"  
-    )
+        # Crear ejemplo de entrada y salida para firma
+        print("📝 Generando firma del modelo...")
+        example_input = torch.randn(4, 1, 28, 28)
+        example_output = model(example_input)
+        
+        # Guardar en archivo local primero
+        local_model_file = local_model_dir / "model.pth"
+        torch.save(model.state_dict(), local_model_file)
+        print(f"💾 Modelo guardado localmente en: {local_model_file}")
 
-    # Esperar unos segundos porque a veces el backend tarda un poco en registrar
-    time.sleep(10)
+        # Registrar modelo en MLflow
+        print("📤 Subiendo modelo a MLflow...")
+        
+        # Firmar el modelo
+        signature = infer_signature(
+            example_input.numpy(), 
+            example_output.detach().numpy()
+        )
+        
+        # Guardar modelo en MLflow
+        mlflow.pytorch.log_model(
+            model, 
+            "mnist_model",
+            signature=signature,
+            input_example=example_input.numpy(),
+            registered_model_name="MNIST-Classifier"
+        )
+        
+        print("✅ Modelo guardado en MLflow")
+        
+        # Obtener la última versión registrada
+        client = MlflowClient()
+        latest_version = client.get_latest_versions("MNIST-Classifier", stages=["None"])[0].version
+        
+        # Promocionar a producción
+        print(f"🔼 Promocionando modelo a producción (versión {latest_version})...")
+        client.transition_model_version_stage(
+            name="MNIST-Classifier",
+            version=latest_version,
+            stage="Production"
+        )
+        
+        print(f"🌟 Modelo promocionado a producción: MNIST-Classifier versión {latest_version}")
+        
+except Exception as e:
+    print(f"❌ Error durante el entrenamiento o registro: {str(e)}")
+    sys.exit(1)
 
-    # Promocionar el modelo registrado a 'Production'
-    client.transition_model_version_stage(
-        name="MNIST-Classifier",
-        version=result.version,
-        stage="Production"
-    )
-
-
-print("✅ Entrenamiento finalizado y modelo registrado en MLflow.")
+print("✅ Proceso completado exitosamente")
