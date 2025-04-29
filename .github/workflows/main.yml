@@ -48,6 +48,17 @@ jobs:
       - name: Entrenar modelo con MLflow
         run: python mlflowMain.py      
 
+      - name: 📡 Subir artifacts al servidor con rsync
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H 167.99.84.228 >> ~/.ssh/known_hosts
+
+          rsync -avz ./mlruns/ root@167.99.84.228:/tmp/mlflow/
+
       - name: Evaluar modelo con MLflow
         run: python mlflowTest.py
 

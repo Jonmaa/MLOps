@@ -30,7 +30,19 @@ transform = transforms.Compose([transforms.ToTensor()])
 train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-# Modelo
+# Definición del modelo
+class SimpleNN(nn.Module):
+    def __init__(self):
+        super(SimpleNN, self).__init__()
+        self.fc1 = nn.Linear(28*28, 128)
+        self.fc2 = nn.Linear(128, 10) # 10 salidas diferentes, una por cada dígito (0-9)
+
+    def forward(self, x):
+        x = x.view(-1, 28*28) # Aplanar la imagen a un vector de 784 valores
+        x = torch.relu(self.fc1(x)) # Relu como función de activación
+        x = self.fc2(x)
+        return x
+
 class DeepNN(nn.Module):
     def __init__(self):
         super(DeepNN, self).__init__()
@@ -39,6 +51,7 @@ class DeepNN(nn.Module):
         self.fc3 = nn.Linear(256, 128)
         self.fc4 = nn.Linear(128, 64)
         self.fc5 = nn.Linear(64, 10)
+
         self.dropout = nn.Dropout(p=0.3)
 
     def forward(self, x):
@@ -51,15 +64,47 @@ class DeepNN(nn.Module):
         x = self.dropout(x)
         x = torch.relu(self.fc4(x))
         x = self.dropout(x)
-        return self.fc5(x)
+        x = self.fc5(x)
+        return x
 
-model = DeepNN()
+
+class CNN_Model(nn.Module): # Modelo de red convolucional para mejorar los patrones de las imágenes
+    def __init__(self):
+        super(CNN_Model, self).__init__()
+        
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        
+        self.pool = nn.MaxPool2d(2, 2)  # Reduce el tamaño a la mitad
+        
+        self.fc1 = nn.Linear(64 * 7 * 7, 128)
+        self.fc2 = nn.Linear(128, 10)
+        
+        self.dropout = nn.Dropout(0.3)
+
+    def forward(self, x):
+        x = torch.relu(self.bn1(self.conv1(x)))
+        x = self.pool(x)
+        x = torch.relu(self.bn2(self.conv2(x)))
+        x = self.pool(x)
+        
+        x = x.view(-1, 64 * 7 * 7)  # Aplanar antes de pasar a las capas densas
+        x = torch.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
+
+
+model = SimpleNN()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 criterion = nn.CrossEntropyLoss()
 
 # MLflow config
 mlflow.set_tracking_uri("http://167.99.84.228:5000")
 mlflow.set_experiment("MNIST-Classification")
+
 
 with mlflow.start_run() as run:
     mlflow.log_param("learning_rate", lr)
@@ -100,7 +145,7 @@ with mlflow.start_run() as run:
 
     # Métricas, tags y artefactos
     mlflow.log_metric("num_parameters", sum(p.numel() for p in model.parameters()))
-    mlflow.set_tag("model_type", "DeepNN")
+    mlflow.set_tag("model_type", model.__class__.__name__)
     mlflow.set_tag("dataset", "MNIST")
     mlflow.set_tag("framework", "PyTorch")
 
@@ -114,20 +159,20 @@ with mlflow.start_run() as run:
     client = MlflowClient()
     client.update_registered_model(
         name="MNIST-Classifier",
-        description="Clasificador de dígitos MNIST con arquitectura DeepNN usando PyTorch y PyFunc."
+        description="Clasificador de dígitos MNIST con arquitecturas de redes neuronales usando PyTorch y PyFunc."
     )
     client.update_model_version(
         name="MNIST-Classifier",
         version=result.version,
         description=(
-            "Modelo entrenado con arquitectura DeepNN (5 capas densas con dropout), "
-            f"learning rate={lr}, batch size={batch_size}, optimizador Adam."
+            f"Modelo entrenado con arquitectura {model.__class__.__name__} "
+            f"y parámetros: learning rate={lr}, batch size={batch_size}, optimizador " + optimizer.__class__.__name__ 
         )
     )
-    client.transition_model_version_stage(
-        name="MNIST-Classifier",
-        version=result.version,
-        stage="Production"
-    )
+    #client.transition_model_version_stage(
+    #    name="MNIST-Classifier",
+    #    version=result.version,
+    #    stage="Production"
+    #)
 
 print("✅ Entrenamiento, logueo y registro finalizado.")
