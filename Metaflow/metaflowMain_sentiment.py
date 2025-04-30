@@ -56,6 +56,7 @@ class IMDBSentimentFlow(FlowSpec):
             scores.append(out['score'])
 
         acc = accuracy_score(labels, preds)
+        print(f"Accuracy: {acc*100:.2f}%")
         current.card.append(Markdown(f"## 🔍 Accuracy: {acc*100:.2f}%"))
 
         self.next(self.end)

@@ -121,6 +121,7 @@ class MNISTFlow(FlowSpec):
                 all_preds += preds.tolist(); all_labels += labels.tolist(); all_imgs += images.numpy().tolist()
         # Accuracy
         acc = sum(p==l for p,l in zip(all_preds,all_labels)) / len(all_labels)
+        print(f"Accuracy: {acc*100:.2f}%")
         current.card.append(Markdown(f"## 🔍 Accuracy: {acc*100:.2f}%"))
         # Selección y figura base64
         idxs = random.sample(range(len(all_imgs)), 10)
