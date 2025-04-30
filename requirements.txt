@@ -1,9 +1,0 @@
-torch
-torchvision
-mlflow
-numpy
-metaflow
-opentelemetry-exporter-otlp
-seaborn
-pylint
-numpy

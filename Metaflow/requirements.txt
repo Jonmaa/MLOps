@@ -1,0 +1,11 @@
+metaflow
+torch
+torchvision
+matplotlib
+seaborn
+numpy
+scikit-learn
+Pillow
+datasets
+transformers
+pandas

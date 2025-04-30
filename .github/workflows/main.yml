@@ -13,6 +13,7 @@ jobs:
       mlflow_changed: ${{ steps.filter.outputs.mlflow }}
       metaflow_changed: ${{ steps.filter.outputs.metaflow }}
       mlflow_sentiment_changed: ${{ steps.filter.outputs.mlflow_sentiment }}
+      metaflow_sentiment_changed: ${{ steps.filter.outputs.metaflow_sentiment }}
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
@@ -26,10 +27,12 @@ jobs:
               - 'MLflow/mlflowMain.py'
               - 'MLflow/mlflowTest.py'
             metaflow:
-              - 'metaflowMain.py'
+              - 'Metaflow/metaflowMain.py'
             mlflow_sentiment:
               - 'MLflow/mlflowMain_sentiment.py'
               - 'MLflow/mlflowTest_sentiment.py'
+            metaflow_sentiment:
+              - 'Metaflow/metaflowMain_sentiment.py'
 
   MLflow_job:
     needs: check-files
@@ -117,15 +120,43 @@ jobs:
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r Metaflow/requirements.txt
 
       - name: Ejecutar modelo con Metaflow
         run: |
-          python metaflowMain.py
-          python metaflowMain.py run
+          python Metaflow/metaflowMain.py
+          python Metaflow/metaflowMain.py run
 
       - name: Guardar modelo 
         uses: actions/upload-artifact@v4
         with:
           name: mnist-model-metaflow
           path: modelo_entrenado_metaflow.pkl
+
+  Metaflow_sentiment_job:
+    needs: check-files
+    if: needs.check-files.outputs.metaflow_sentiment_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r Metaflow/requirements.txt
+
+      - name: Ejecutar modelo con Metaflow
+        run: |
+          python Metaflow/metaflowMain_sentiment.py run
+
+      - name: Guardar modelo 
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnist-model-metaflow
+          path: modelo_entrenado_metaflow_sentiment.pkl
