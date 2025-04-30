@@ -1,0 +1,6 @@
+torch
+torchvision
+mlflow
+numpy
+pandas
+scikit-learn

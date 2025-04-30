@@ -22,8 +22,8 @@ jobs:
         with:
           filters: |
             mlflow:
-              - 'mlflowMain.py'
-              - 'mlflowTest.py'
+              - 'MLflow/mlflowMain.py'
+              - 'MLflow/mlflowTest.py'
             metaflow:
               - 'metaflowMain.py'
 
@@ -43,10 +43,10 @@ jobs:
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r MLflow/requirements.txt
 
       - name: Entrenar modelo con MLflow
-        run: python mlflowMain.py      
+        run: python MLflow/mlflowMain.py      
 
       - name: Subir artifacts al servidor con rsync
         env:
@@ -60,7 +60,7 @@ jobs:
           rsync -avz /tmp/mlflow/artifacts/ root@167.99.84.228:/tmp/mlflow/artifacts
 
       - name: Evaluar modelo con MLflow
-        run: python mlflowTest.py
+        run: python MLflow/mlflowTest.py
 
   Metaflow_job:
     needs: check-files
