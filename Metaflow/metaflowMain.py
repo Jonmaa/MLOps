@@ -75,7 +75,7 @@ class MNISTFlow(FlowSpec):
 
     @step
     def start(self):
-        print("📌 Inicio del flujo MNISTFlow")
+        print("Inicio del flujo MNISTFlow")
         self.next(self.load_data)
 
     @step
@@ -89,7 +89,7 @@ class MNISTFlow(FlowSpec):
 
     @step
     def train_model(self):
-        print("🚀 Entrenando modelo...")
+        print("Entrenando modelo...")
         self.model = DeepNN()
         optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
         criterion = nn.CrossEntropyLoss()
@@ -112,7 +112,7 @@ class MNISTFlow(FlowSpec):
     @card(type='html')
     @step
     def evaluate_model(self):
-        print("📊 Evaluación en test set...")
+        print("Evaluación en test set...")
         self.model.eval(); all_preds, all_labels, all_imgs = [], [], []
         with torch.no_grad():
             for images, labels in self.test_loader:
