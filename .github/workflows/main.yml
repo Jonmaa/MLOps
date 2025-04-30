@@ -1,4 +1,4 @@
-name: Train and Test MNIST with MLflow
+name: Train and Test MNIST & Sentiment Analysis Models
 
 on:
   push:
@@ -12,6 +12,7 @@ jobs:
     outputs:
       mlflow_changed: ${{ steps.filter.outputs.mlflow }}
       metaflow_changed: ${{ steps.filter.outputs.metaflow }}
+      mlflow_sentiment_changed: ${{ steps.filter.outputs.mlflow_sentiment }}
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
@@ -26,6 +27,9 @@ jobs:
               - 'MLflow/mlflowTest.py'
             metaflow:
               - 'metaflowMain.py'
+            mlflow_sentiment:
+              - 'MLflow/mlflowMain_sentiment.py'
+              - 'MLflow/mlflowTest_sentiment.py'
 
   MLflow_job:
     needs: check-files
@@ -61,6 +65,41 @@ jobs:
 
       - name: Evaluar modelo con MLflow
         run: python MLflow/mlflowTest.py
+  
+  MLflow_sentiment_job:
+    needs: check-files
+    if: needs.check-files.outputs.mlflow_sentiment_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r MLflow/requirements.txt
+
+      - name: Entrenar Sentiment
+        run: python MLflow/mlflowMain_sentiment.py
+
+      - name: Subir artifacts al servidor con rsync
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H 167.99.84.228 >> ~/.ssh/known_hosts
+
+          rsync -avz /tmp/mlflow/artifacts/ root@167.99.84.228:/tmp/mlflow/artifacts
+
+      - name: Evaluar Sentiment
+        run: python MLflow/mlflowTest_sentiment.py
 
   Metaflow_job:
     needs: check-files

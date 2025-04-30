@@ -4,3 +4,5 @@ mlflow
 numpy
 pandas
 scikit-learn
+transformers
+datasets
