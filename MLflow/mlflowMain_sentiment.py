@@ -7,13 +7,15 @@ import time
 from mlflow.tracking import MlflowClient
 
 class SentimentWrapper(mlflow.pyfunc.PythonModel):
+    def __init__(self, model_name):
+        self.model_name = model_name
+
     def load_context(self, context):
-        # Se ejecuta una vez al servir, carga el pipeline
-        model_name = context.artifacts["model_name"]
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        from transformers import pipeline, AutoTokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self.classifier = pipeline(
             "sentiment-analysis",
-            model=model_name,
+            model=self.model_name,
             tokenizer=self.tokenizer,
             device=-1,
             truncation=True,
@@ -21,11 +23,10 @@ class SentimentWrapper(mlflow.pyfunc.PythonModel):
         )
 
     def predict(self, context, model_input: pd.DataFrame):
-        # model_input espera una columna "text"
         texts = model_input["text"].tolist()
         preds = self.classifier(texts)
-        # Convertimos a DataFrame de salida
         return pd.DataFrame(preds)
+
 
 
 mlflow.set_tracking_uri("http://167.99.84.228:5000")
@@ -51,11 +52,11 @@ with mlflow.start_run() as run:
     # 3) Loguea el modelo PyFunc
     mlflow.pyfunc.log_model(
         artifact_path="sentiment_model",
-        python_model=SentimentWrapper(),
-        artifacts={"model_name": model_name},
+        python_model=SentimentWrapper(model_name),
         input_example=example_df,
         signature=sig
     )
+
 
     # 4) Registra en Model Registry
     result = mlflow.register_model(
@@ -71,5 +72,5 @@ with mlflow.start_run() as run:
         version=result.version,
         stage="Production"
     )
-    
+
 print("✅ Modelo de sentimiento registrado en MLflow")
