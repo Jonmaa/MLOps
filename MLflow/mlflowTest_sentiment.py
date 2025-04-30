@@ -20,6 +20,9 @@ df = pd.DataFrame({
     "label": ds["label"]  # 0 = negative, 1 = positive
 })
 
+# Opcional: tomar solo N muestras si quieres un subset más pequeño
+df = df.sample(500, random_state=42).reset_index(drop=True)
+
 # 3) Predecir con el modelo PyFunc
 # El wrapper devolvió un DataFrame con columnas ['label','score']
 preds_df = model.predict(df[["text"]])
