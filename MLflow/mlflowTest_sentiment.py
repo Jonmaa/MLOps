@@ -21,11 +21,14 @@ df = pd.DataFrame({
 })
 
 # Opcional: tomar solo N muestras si quieres un subset más pequeño
-df = df.sample(500, random_state=42).reset_index(drop=True)
+# 250 negativos + 250 positivos
+neg = df[df.label == 0].sample(250, random_state=42)
+pos = df[df.label == 1].sample(250, random_state=42)
+df_small = pd.concat([neg, pos]).reset_index(drop=True)
 
 # 3) Predecir con el modelo PyFunc
 # El wrapper devolvió un DataFrame con columnas ['label','score']
-preds_df = model.predict(df[["text"]])
+preds_df = model.predict(df_small[["text"]])
 
 # Mapear etiquetas de texto a 0/1
 df["pred"] = preds_df["label"].map({"NEGATIVE": 0, "POSITIVE": 1})
