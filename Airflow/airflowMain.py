@@ -1,108 +1,132 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
-from datasets import load_dataset
-from transformers import pipeline, AutoTokenizer
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import datasets, transforms
+import pickle
 from sklearn.metrics import accuracy_score, classification_report
-import pandas as pd
 
+# --- Definición del modelo (DeepNN idéntico al de Metaflow) ---
+class DeepNN(nn.Module):
+    def __init__(self):
+        super(DeepNN, self).__init__()
+        self.fc1 = nn.Linear(28*28, 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.fc3 = nn.Linear(256, 128)
+        self.fc4 = nn.Linear(128, 64)
+        self.fc5 = nn.Linear(64, 10)
+        self.dropout = nn.Dropout(p=0.3)
+
+    def forward(self, x):
+        x = x.view(-1, 28*28)
+        x = torch.relu(self.fc1(x)); x = self.dropout(x)
+        x = torch.relu(self.fc2(x)); x = self.dropout(x)
+        x = torch.relu(self.fc3(x)); x = self.dropout(x)
+        x = torch.relu(self.fc4(x)); x = self.dropout(x)
+        return self.fc5(x)
+
+# --- Parámetros por defecto del DAG ---
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': datetime(2023, 1, 1),
+    'start_date': datetime(2025, 5, 1),
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
 }
 
-def fetch_imdb_dataset(ti, **kwargs):
-    """
-    1) Descarga TODO el split de test,
-    2) Toma 250 ejemplos negativos y 250 positivos,
-    3) Empuja el subset balanceado a XCom.
-    """
-    # 1) Descarga completo
-    ds = load_dataset('imdb', split='test')
-    df_full = pd.DataFrame({
-        'text': ds['text'],
-        'label': ds['label']  # 0=negativo, 1=positivo
-    })
+# --- Funciones de las tareas ---
+def train_model(**kwargs):
+    # 1) Crea DataLoader de entrenamiento
+    transform = transforms.Compose([transforms.ToTensor()])
+    train_ds = datasets.MNIST(root='/tmp/mnist_data', train=True,
+                              transform=transform, download=True)
+    train_loader = torch.utils.data.DataLoader(train_ds, batch_size=64,
+                                               shuffle=True)
+    # 2) Instancia el modelo y optimizador
+    model = DeepNN()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.CrossEntropyLoss()
 
-    # 2) Estratifica 250 de cada clase
-    neg = df_full[df_full.label == 0].sample(250, random_state=42)
-    pos = df_full[df_full.label == 1].sample(250, random_state=42)
-    df_small = pd.concat([neg, pos]).reset_index(drop=True)
+    # 3) Bucle de entrenamiento
+    for epoch in range(10):
+        total_loss = 0.0
+        for images, labels in train_loader:
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+        print(f"Epoch {epoch+1}/10, loss={total_loss/len(train_loader):.4f}")
 
-    # 3) Lo guardamos en XCom como JSON
-    ti.xcom_push(key='imdb_dataset', value=df_small.to_json())
-    print(f"✅ Subset IMDB listo: {len(df_small)} muestras (250 neg + 250 pos)")
+    # 4) Serializa el modelo a disco
+    model_path = '/tmp/mnist_model.pkl'
+    with open(model_path, 'wb') as f:
+        pickle.dump(model, f)
+    print(f"Modelo guardado en {model_path}")
 
-def analyze_with_model(ti, **kwargs):
-    """
-    Recupera df_small de XCom, carga el modelo HuggingFace y evalúa.
-    """
-    # 1) Recupera el subset
-    dataset_json = ti.xcom_pull(key='imdb_dataset', task_ids='fetch_imdb_dataset')
-    df_small = pd.read_json(dataset_json)
+    # 5) Comunica la ruta del modelo al siguiente paso
+    ti = kwargs['ti']
+    ti.xcom_push(key='model_path', value=model_path)
 
-    # 2) Inicializa el clasificador
-    model_name = "distilbert-base-uncased-finetuned-sst-2-english"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    classifier = pipeline(
-        "sentiment-analysis",
-        model=model_name,
-        tokenizer=tokenizer,
-        device=-1,        # CPU
-        truncation=True,
-        max_length=512
-    )
 
-    texts  = df_small['text'].tolist()
-    labels = df_small['label'].tolist()
+def evaluate_model(**kwargs):
+    # 1) Recupera la ruta del modelo desde XCom
+    ti = kwargs['ti']
+    model_path = ti.xcom_pull(key='model_path', task_ids='train_model')
+    # 2) Carga el modelo
+    with open(model_path, 'rb') as f:
+        model = pickle.load(f)
+    model.eval()
 
-    # 3) Predicciones
-    preds, scores = [], []
-    for txt in texts:
-        out = classifier(txt[:512])[0]
-        preds.append(1 if out['label']=='POSITIVE' else 0)
-        scores.append(out['score'])
+    # 3) Prepara DataLoader de test
+    transform = transforms.Compose([transforms.ToTensor()])
+    test_ds = datasets.MNIST(root='/tmp/mnist_data', train=False,
+                             transform=transform, download=True)
+    test_loader = torch.utils.data.DataLoader(test_ds, batch_size=64,
+                                              shuffle=False)
 
-    # 4) Métricas
-    acc    = accuracy_score(labels, preds)
-    report = classification_report(labels, preds, target_names=['Negative','Positive'])
+    # 4) Inferencia y métricas
+    all_preds, all_labels = [], []
+    with torch.no_grad():
+        for images, labels in test_loader:
+            outputs = model(images)
+            _, preds = torch.max(outputs, 1)
+            all_preds.extend(preds.tolist())
+            all_labels.extend(labels.tolist())
 
-    print(f"\n🔍 Accuracy: {acc*100:.2f}%")
-    print("\n🎯 Classification report:")
-    print(report)
+    acc = accuracy_score(all_labels, all_preds)
+    print(f"\n🔍 Accuracy en test: {acc*100:.2f}%\n")
+    print(classification_report(all_labels, all_preds,
+                                target_names=[str(i) for i in range(10)]))
 
-    # 5) Guardamos resultados para siguiente paso si hace falta
-    results_df = pd.DataFrame({
-        'text':    texts,
-        'true':    labels,
-        'pred':    preds,
-        'score':   scores
-    })
-    ti.xcom_push(key='analysis_results', value=results_df.to_json())
+    # 5) Opcional: push de la métrica
+    ti.xcom_push(key='test_accuracy', value=acc)
 
-# Definición del DAG
+
+# --- Definición del DAG ---
 with DAG(
-    'imdb_sentiment_analysis_fixed',
+    dag_id='mnist_classification_airflow',
     default_args=default_args,
-    description='Análisis de sentimientos IMDB con subset estratificado',
+    description='Entrena y evalúa MNIST con PyTorch (DeepNN)',
     schedule_interval=None,
     catchup=False,
-    tags=['nlp','sentiment-analysis'],
+    tags=['mnist','pytorch'],
 ) as dag:
 
-    fetch_task = PythonOperator(
-        task_id='fetch_imdb_dataset',
-        python_callable=fetch_imdb_dataset,
-        provide_context=True,
-    )
-    
-    analyze_task = PythonOperator(
-        task_id='analyze_with_model',
-        python_callable=analyze_with_model,
+    t1 = PythonOperator(
+        task_id='train_model',
+        python_callable=train_model,
         provide_context=True,
     )
 
-    fetch_task >> analyze_task
+    t2 = PythonOperator(
+        task_id='evaluate_model',
+        python_callable=evaluate_model,
+        provide_context=True,
+    )
+
+    # Orden de ejecución
+    t1 >> t2
