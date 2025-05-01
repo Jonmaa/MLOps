@@ -78,7 +78,7 @@ def evaluate_model_performance(**kwargs):
     results_json = ti.xcom_pull(task_ids='analyze_with_model', key='analysis_results')
     df_small = pd.read_json(results_json)
     
-    # Filtramos cualquier predicción neutral que pueda haberse generado por errores 
+    # Filtramos cualquier predicción neutral que pueda haberse generado por error
     df_small = df_small[df_small['prediction'].isin([0, 1])]
     
     if len(df_small) > 0:
