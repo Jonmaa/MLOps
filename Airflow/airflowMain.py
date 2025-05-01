@@ -8,7 +8,6 @@ from torchvision import datasets, transforms
 import pickle
 from sklearn.metrics import accuracy_score, classification_report
 
-# --- Definición del modelo (DeepNN idéntico al de Metaflow) ---
 class DeepNN(nn.Module):
     def __init__(self):
         super(DeepNN, self).__init__()
@@ -26,6 +25,46 @@ class DeepNN(nn.Module):
         x = torch.relu(self.fc3(x)); x = self.dropout(x)
         x = torch.relu(self.fc4(x)); x = self.dropout(x)
         return self.fc5(x)
+    
+class SimpleNN(nn.Module):
+    def __init__(self):
+        super(SimpleNN, self).__init__()
+        self.fc1 = nn.Linear(28*28, 128)
+        self.fc2 = nn.Linear(128, 10) 
+
+    def forward(self, x):
+        x = x.view(-1, 28*28) 
+        x = torch.relu(self.fc1(x)) 
+        x = self.fc2(x)
+        return x
+    
+class CNN_Model(nn.Module): 
+    def __init__(self):
+        super(CNN_Model, self).__init__()
+        
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        
+        self.pool = nn.MaxPool2d(2, 2)  
+        
+        self.fc1 = nn.Linear(64 * 7 * 7, 128)
+        self.fc2 = nn.Linear(128, 10)
+        
+        self.dropout = nn.Dropout(0.3)
+
+    def forward(self, x):
+        x = torch.relu(self.bn1(self.conv1(x)))
+        x = self.pool(x)
+        x = torch.relu(self.bn2(self.conv2(x)))
+        x = self.pool(x)
+        
+        x = x.view(-1, 64 * 7 * 7)  
+        x = torch.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
 
 # --- Parámetros por defecto del DAG ---
 default_args = {
@@ -36,20 +75,20 @@ default_args = {
     'retry_delay': timedelta(minutes=5),
 }
 
-# --- Funciones de las tareas ---
+# Tareas del DAG
 def train_model(**kwargs):
-    # 1) Crea DataLoader de entrenamiento
+
     transform = transforms.Compose([transforms.ToTensor()])
     train_ds = datasets.MNIST(root='/tmp/mnist_data', train=True,
                               transform=transform, download=True)
     train_loader = torch.utils.data.DataLoader(train_ds, batch_size=64,
                                                shuffle=True)
-    # 2) Instancia el modelo y optimizador
+
     model = DeepNN()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.CrossEntropyLoss()
 
-    # 3) Bucle de entrenamiento
+
     for epoch in range(10):
         total_loss = 0.0
         for images, labels in train_loader:
@@ -61,34 +100,32 @@ def train_model(**kwargs):
             total_loss += loss.item()
         print(f"Epoch {epoch+1}/10, loss={total_loss/len(train_loader):.4f}")
 
-    # 4) Serializa el modelo a disco
+
     model_path = '/tmp/mnist_model.pkl'
     with open(model_path, 'wb') as f:
         pickle.dump(model, f)
     print(f"Modelo guardado en {model_path}")
 
-    # 5) Comunica la ruta del modelo al siguiente paso
     ti = kwargs['ti']
     ti.xcom_push(key='model_path', value=model_path)
 
 
 def evaluate_model(**kwargs):
-    # 1) Recupera la ruta del modelo desde XCom
+
     ti = kwargs['ti']
     model_path = ti.xcom_pull(key='model_path', task_ids='train_model')
-    # 2) Carga el modelo
+
     with open(model_path, 'rb') as f:
         model = pickle.load(f)
     model.eval()
 
-    # 3) Prepara DataLoader de test
     transform = transforms.Compose([transforms.ToTensor()])
     test_ds = datasets.MNIST(root='/tmp/mnist_data', train=False,
                              transform=transform, download=True)
     test_loader = torch.utils.data.DataLoader(test_ds, batch_size=64,
                                               shuffle=False)
 
-    # 4) Inferencia y métricas
+
     all_preds, all_labels = [], []
     with torch.no_grad():
         for images, labels in test_loader:
@@ -102,7 +139,7 @@ def evaluate_model(**kwargs):
     print(classification_report(all_labels, all_preds,
                                 target_names=[str(i) for i in range(10)]))
 
-    # 5) Opcional: push de la métrica
+
     ti.xcom_push(key='test_accuracy', value=acc)
 
 
@@ -128,5 +165,4 @@ with DAG(
         provide_context=True,
     )
 
-    # Orden de ejecución
     t1 >> t2
