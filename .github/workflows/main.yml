@@ -14,6 +14,7 @@ jobs:
       metaflow_changed: ${{ steps.filter.outputs.metaflow }}
       mlflow_sentiment_changed: ${{ steps.filter.outputs.mlflow_sentiment }}
       metaflow_sentiment_changed: ${{ steps.filter.outputs.metaflow_sentiment }}
+      airflow_changed: ${{ steps.filter.outputs.airflow }}
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
@@ -33,6 +34,8 @@ jobs:
               - 'MLflow/mlflowTest_sentiment.py'
             metaflow_sentiment:
               - 'Metaflow/metaflowMain_sentiment.py'
+            airflow:
+              - 'Airflow/airflowMain.py'
 
   MLflow_job:
     needs: check-files
@@ -160,3 +163,22 @@ jobs:
         with:
           name: mnist-model-metaflow
           path: modelo_entrenado_metaflow_sentiment.pkl
+
+  Airflow_job:
+    needs: check-files
+    if: needs.check-files.outputs.airflow_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Subir DAGS al servidor con rsync
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H 165.232.101.242 >> ~/.ssh/known_hosts
+
+          rsync -avz Airflow/*py root@165.232.101.242:/tmp/airflow/dags
+        

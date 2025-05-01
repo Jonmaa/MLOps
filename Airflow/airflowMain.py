@@ -16,7 +16,7 @@ default_args = {
 
 def fetch_imdb_dataset(**kwargs):
     """Obtiene el dataset IMDB de Hugging Face con un tamaño manejable"""
-    dataset = load_dataset('imdb', split='test[:10%]')  # 10% del conjunto de prueba
+    dataset = load_dataset('imdb', split='test')  
     
     df = pd.DataFrame({
         'text': dataset['text'],
