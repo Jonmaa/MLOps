@@ -178,7 +178,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H 165.232.101.242 >> ~/.ssh/known_hosts
+          ssh-keyscan -H 46.101.82.190 >> ~/.ssh/known_hosts
 
-          rsync -avz Airflow/*py root@165.232.101.242:/tmp/airflow/dags
+          rsync -avz Airflow/*py airflow@46.101.82.190:/home/airflow/airflowServer/dags
         
