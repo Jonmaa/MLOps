@@ -23,17 +23,20 @@ def fetch_imdb_dataset(**kwargs):
         'label': dataset['label']  # 0=negativo, 1=positivo
     })
     
-    # Usamos solo 50 muestras para demostración
-    df = df.sample(50, random_state=42).reset_index(drop=True)
-    
-    kwargs['ti'].xcom_push(key='imdb_dataset', value=df.to_json())
-    print(f"Dataset cargado con {len(df)} muestras")
+    # 3) Muestreo estratificado
+    neg = df[df.label == 0].sample(250, random_state=42)
+    pos = df[df.label == 1].sample(250, random_state=42)
+    df_small = pd.concat([neg, pos]).reset_index(drop=True)
+
+    # 4) Empujamos el subset balanceado
+    kwargs['ti'].xcom_push(key='imdb_dataset', value=df_small.to_json())
+    print(f"Dataset cargado con {len(df_small)} muestras (250 neg + 250 pos)")
 
 def analyze_with_model(**kwargs):
     """Realiza el análisis de sentimientos con manejo de textos largos"""
     ti = kwargs['ti']
     dataset_json = ti.xcom_pull(task_ids='fetch_imdb_dataset', key='imdb_dataset')
-    df = pd.read_json(dataset_json)
+    df_small = pd.read_json(dataset_json)
     
     # Configuración del modelo
     model_name = "distilbert-base-uncased-finetuned-sst-2-english"
@@ -51,7 +54,7 @@ def analyze_with_model(**kwargs):
     
     # Procesamos con manejo de errores
     predictions = []
-    for text in df['text']:
+    for text in df_small['text']:
         try:
             # Truncamos el texto a 500 caracteres para asegurar que esté dentro del límite
             truncated_text = text[:500]
@@ -63,8 +66,8 @@ def analyze_with_model(**kwargs):
             predictions.append({'label': 'NEUTRAL', 'score': 0.5})
     
     # Convertimos resultados
-    df['prediction'] = [1 if pred['label'] == 'POSITIVE' else 0 for pred in predictions]
-    df['confidence'] = [pred['score'] for pred in predictions]
+    df_small['prediction'] = [1 if pred['label'] == 'POSITIVE' else 0 for pred in predictions]
+    df_small['confidence'] = [pred['score'] for pred in predictions]
     
     ti.xcom_push(key='analysis_results', value=df.to_json())
     print("Análisis completado")
@@ -73,14 +76,14 @@ def evaluate_model_performance(**kwargs):
     """Evalúa el rendimiento del modelo"""
     ti = kwargs['ti']
     results_json = ti.xcom_pull(task_ids='analyze_with_model', key='analysis_results')
-    df = pd.read_json(results_json)
+    df_small = pd.read_json(results_json)
     
     # Filtramos cualquier predicción neutral que pueda haberse generado por errores 
-    df = df[df['prediction'].isin([0, 1])]
+    df_small = df_small[df_small['prediction'].isin([0, 1])]
     
-    if len(df) > 0:
-        accuracy = accuracy_score(df['label'], df['prediction'])
-        report = classification_report(df['label'], df['prediction'], target_names=['Negative', 'Positive'])
+    if len(df_small) > 0:
+        accuracy = accuracy_score(df_small['label'], df_small['prediction'])
+        report = classification_report(df_small['label'], df_small['prediction'], target_names=['Negative', 'Positive'])
         
         print("\n" + "="*50)
         print("EVALUACIÓN DEL MODELO DE SENTIMENT ANALYSIS")
