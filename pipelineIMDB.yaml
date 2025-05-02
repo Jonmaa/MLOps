@@ -1,0 +1,131 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: imdb-sentiment-analysis-
+spec:
+  entrypoint: sentiment-pipeline
+  volumes:
+  - name: shared-data
+    emptyDir: {}
+
+  templates:
+  - name: sentiment-pipeline
+    dag:
+      tasks:
+      - name: fetch-dataset
+        template: fetch-dataset
+      - name: analyze-with-model
+        template: analyze-with-model
+        dependencies: [fetch-dataset]
+        arguments:
+          artifacts:
+          - name: imdb-dataset
+            from: "{{tasks.fetch-dataset.outputs.artifacts.imdb-dataset}}"
+
+  - name: fetch-dataset
+    container:
+      image: python:3.9
+      command: ["sh", "-c"]
+      args:
+      - |
+        pip install pandas datasets --quiet && \
+        
+        python -c "
+        import pandas as pd
+        from datasets import load_dataset
+        import json
+        import os
+
+        # 1) Descarga completo
+        ds = load_dataset('imdb', split='test')
+        df_full = pd.DataFrame({
+            'text': ds['text'],
+            'label': ds['label']  # 0=negativo, 1=positivo
+        })
+
+        # 2) Estratifica 250 de cada clase
+        neg = df_full[df_full.label == 0].sample(250, random_state=42)
+        pos = df_full[df_full.label == 1].sample(250, random_state=42)
+        df_small = pd.concat([neg, pos]).reset_index(drop=True)
+
+        # 3) Guarda en volumen compartido
+        os.makedirs('/mnt/data', exist_ok=True)
+        df_small.to_json('/mnt/data/imdb_dataset.json')
+        print(f' Subset IMDB listo: {len(df_small)} muestras (250 neg + 250 pos)')
+        "
+      volumeMounts:
+      - name: shared-data
+        mountPath: /mnt/data
+    outputs:
+      artifacts:
+      - name: imdb-dataset
+        path: /mnt/data/imdb_dataset.json
+
+  - name: analyze-with-model
+    container:
+      image: python:3.9
+      command: ["sh", "-c"]
+      args:
+      - |
+        pip install pandas transformers scikit-learn torch --quiet && \
+        
+        python -c "
+        import pandas as pd
+        from transformers import pipeline, AutoTokenizer
+        from sklearn.metrics import accuracy_score, classification_report
+        import json
+
+        # 1) Carga el dataset
+        with open('/mnt/data/imdb_dataset.json') as f:
+            df_small = pd.read_json(f)
+
+        # 2) Inicializa el clasificador
+        model_name = 'distilbert-base-uncased-finetuned-sst-2-english'
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        classifier = pipeline(
+            'sentiment-analysis',
+            model=model_name,
+            tokenizer=tokenizer,
+            device=-1,        # CPU
+            truncation=True,
+            max_length=512
+        )
+
+        texts  = df_small['text'].tolist()
+        labels = df_small['label'].tolist()
+
+        # 3) Predicciones
+        preds, scores = [], []
+        for txt in texts:
+            out = classifier(txt[:512])[0]
+            preds.append(1 if out['label']=='POSITIVE' else 0)
+            scores.append(out['score'])
+
+        # 4) Métricas
+        acc    = accuracy_score(labels, preds)
+        report = classification_report(labels, preds, target_names=['Negative','Positive'])
+
+        print(f'\nAccuracy: {acc*100:.2f}%')
+        print('\nClassification report:')
+        print(report)
+
+        # 5) Guarda resultados
+        results_df = pd.DataFrame({
+            'text':    texts,
+            'true':    labels,
+            'pred':    preds,
+            'score':   scores
+        })
+        results_df.to_json('/mnt/data/analysis_results.json')
+        "
+      volumeMounts:
+      - name: shared-data
+        mountPath: /mnt/data
+    inputs:
+      artifacts:
+      - name: imdb-dataset
+        path: /mnt/data/imdb_dataset.json
+    outputs:
+      artifacts:
+      - name: analysis-results
+        path: /mnt/data/analysis_results.json
