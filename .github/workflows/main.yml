@@ -15,6 +15,7 @@ jobs:
       mlflow_sentiment_changed: ${{ steps.filter.outputs.mlflow_sentiment }}
       metaflow_sentiment_changed: ${{ steps.filter.outputs.metaflow_sentiment }}
       airflow_changed: ${{ steps.filter.outputs.airflow }}
+      kubeflow_changed: ${{ steps.filter.outputs.kubeflow }}
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
@@ -36,6 +37,11 @@ jobs:
               - 'Metaflow/metaflowMain_sentiment.py'
             airflow:
               - 'Airflow/airflowMain.py'
+              - 'Airflow/airflowMain_sentiment.py'
+            kubeflow:
+              - 'Kubeflow/pipelineIMDB.yaml'
+              - 'Kubeflow/pipelineMNIST.yaml'
+
 
   MLflow_job:
     needs: check-files
@@ -182,3 +188,13 @@ jobs:
 
           rsync -avz Airflow/*py airflow@46.101.82.190:/home/airflow/airflowServer/dags
         
+  Kubeflow_job:
+    needs: check-files
+    if: needs.check-files.outputs.kubeflow_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Mostrar mensaje de cambios recibidos
+        run: echo "Se han recibido cambios en Kubeflow."
