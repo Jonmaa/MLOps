@@ -41,7 +41,7 @@ class IMDBSentimentFlow(FlowSpec):
         self.next(self.predict)
 
     
-    @card(type="html")
+    @card
     @step
     def predict(self):
         print("Ejecutando sentiment analysis...")

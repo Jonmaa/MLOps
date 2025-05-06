@@ -109,7 +109,7 @@ class MNISTFlow(FlowSpec):
         print("Modelo serializado en model.pkl")
         self.next(self.evaluate_model)
 
-    @card(type='html')
+    @card
     @step
     def evaluate_model(self):
         print("Evaluación en test set...")
