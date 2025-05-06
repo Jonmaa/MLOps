@@ -19,7 +19,7 @@ if __name__ == "__main__":
     ds = load_dataset("imdb", split="test")
     df_full = pd.DataFrame({
         "text": ds["text"],
-        "label": ds["label"]  # 0=negative, 1=positive
+        "label": ds["label"]  # 0=negativo, 1=positivo
     })
 
     # 3) Estratificar: 250 negativos + 250 positivos
