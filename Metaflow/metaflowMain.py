@@ -7,6 +7,8 @@ import pickle
 import matplotlib.pyplot as plt
 import random
 import io, base64
+from sklearn.manifold import TSNE
+import numpy as np
 from metaflow.cards import Markdown
 
 class CNN_Model(nn.Module):
@@ -113,27 +115,46 @@ class MNISTFlow(FlowSpec):
     @step
     def evaluate_model(self):
         print("Evaluación en test set...")
-        self.model.eval(); all_preds, all_labels, all_imgs = [], [], []
+        self.model.eval()
+        all_preds, all_labels, all_imgs = [], [], []
+        embeddings = []
+    
         with torch.no_grad():
             for images, labels in self.test_loader:
                 outputs = self.model(images)
-                _, preds = torch.max(outputs,1)
-                all_preds += preds.tolist(); all_labels += labels.tolist(); all_imgs += images.numpy().tolist()
-        # Accuracy
-        acc = sum(p==l for p,l in zip(all_preds,all_labels)) / len(all_labels)
+                _, preds = torch.max(outputs, 1)
+                all_preds += preds.tolist()
+                all_labels += labels.tolist()
+                all_imgs += images.numpy().tolist()
+                # Obtener embeddings del penúltimo layer
+                x = images.view(-1, 28 * 28)
+                layer_output = torch.relu(self.model.fc4(torch.relu(self.model.fc3(torch.relu(self.model.fc2(torch.relu(self.model.fc1(x))))))))
+                embeddings.append(layer_output.numpy())
+    
+        acc = sum(p == l for p, l in zip(all_preds, all_labels)) / len(all_labels)
         print(f"Accuracy: {acc*100:.2f}%")
         current.card.append(Markdown(f"## 🔍 Accuracy: {acc*100:.2f}%"))
-        # Selección y figura base64
-        idxs = random.sample(range(len(all_imgs)), 10)
-        fig, axes = plt.subplots(1,10,figsize=(15,2))
-        for ax, i in zip(axes, idxs):
-            img = all_imgs[i][0]
-            ax.imshow(img, cmap='gray'); ax.set_title(f"P:{all_preds[i]}/R:{all_labels[i]}"); ax.axis('off')
-        plt.tight_layout()
-        buf = io.BytesIO(); fig.savefig(buf, format='png'); buf.seek(0)
+    
+        # Reducimos los embeddings a 2D usando t-SNE
+        embeddings = np.vstack(embeddings)
+        tsne = TSNE(n_components=2, random_state=42, perplexity=30)
+        reduced = tsne.fit_transform(embeddings)
+    
+        # Graficamos la dispersión
+        fig, ax = plt.subplots(figsize=(10, 6))
+        scatter = ax.scatter(reduced[:, 0], reduced[:, 1], c=all_labels, cmap='tab10', alpha=0.6)
+        legend = ax.legend(*scatter.legend_elements(), title="Clases")
+        ax.add_artist(legend)
+        ax.set_title("Visualización t-SNE de las representaciones aprendidas")
+        
+        # Guardamos la figura como base64
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png')
+        buf.seek(0)
         img_b64 = base64.b64encode(buf.read()).decode()
-        current.card.append(Markdown(f"![samples](data:image/png;base64,{img_b64})"))
+        current.card.append(Markdown(f"![t-SNE](data:image/png;base64,{img_b64})"))
         plt.close(fig)
+    
         self.next(self.end)
 
     @step
