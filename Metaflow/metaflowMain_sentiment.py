@@ -105,6 +105,8 @@ class IMDBSentimentFlow(FlowSpec):
     @step
     def end(self):
         print("🎉 IMDB Sentiment analysis finalizado.")
+        self.classifier.model.save_pretrained("sentiment_model/")
+        self.tokenizer.save_pretrained("sentiment_model/")
 
 if __name__ == "__main__":
     IMDBSentimentFlow()
