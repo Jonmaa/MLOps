@@ -179,9 +179,7 @@ with mlflow.start_run() as run:
         stage="Production"
     )
 
-    # Guardar IDs para rsync en GitHub Actions
-    with open("mlflow_run_info.txt", "w") as f:
-        f.write(f"{run.info.experiment_id}\n{run.info.run_id}\n")
+    
 
 
 print("✅ Entrenamiento, logueo y registro finalizado.")
