@@ -73,7 +73,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H 167.99.84.228 >> ~/.ssh/known_hosts
 
-          rsync -avz /tmp/mlflow/artifacts/ root@167.99.84.228:/mlflow/mlflow/artifacts
+          rsync -avz /tmp/mlflow/artifacts/ root@167.99.84.228:/root/mlflow/artifacts
 
       - name: Evaluar modelo con MLflow
         run: python MLflow/mlflowTest.py
