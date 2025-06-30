@@ -62,7 +62,14 @@ jobs:
           pip install -r MLflow/requirements.txt
 
       - name: Entrenar modelo con MLflow
-        run: python MLflow/mlflowMain.py      
+        run: python MLflow/mlflowMain.py
+
+      - name: Leer IDs del experimento y run
+        id: leer_ids
+        run: |
+          IFS=$'\n' read -r EXP_ID RUN_ID < mlflow_run_info.txt
+          echo "EXP_ID=$EXP_ID" >> $GITHUB_ENV
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
 
       - name: Subir artifacts al servidor con rsync
         env:
@@ -72,8 +79,8 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H 167.99.84.228 >> ~/.ssh/known_hosts
-
-          rsync -avz /tmp/mlflow/artifacts/ root@167.99.84.228:/tmp/mlflow/artifacts
+          rsync -avz mlruns/$EXP_ID/$RUN_ID/artifacts/ \
+            root@167.99.84.228:/tmp/mlflow/artifacts/$EXP_ID/$RUN_ID/artifacts/
 
       - name: Evaluar modelo con MLflow
         run: python MLflow/mlflowTest.py
