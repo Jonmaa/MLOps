@@ -158,6 +158,9 @@ class MNISTFlow(FlowSpec):
         self.next(self.end)
 
     @step
-    def end(self): print("🎉 Run completo")
+    def end(self):
+        print("🎉 Run completo")
+        self.classifier.model.save_pretrained("mnist_model/")
+        self.tokenizer.save_pretrained("mnist_model/")
 
 if __name__=='__main__': MNISTFlow()
