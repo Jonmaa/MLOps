@@ -135,14 +135,13 @@ jobs:
 
       - name: Ejecutar modelo con Metaflow
         run: |
-          python Metaflow/metaflowMain.py
           python Metaflow/metaflowMain.py run
 
       - name: Guardar modelo 
         uses: actions/upload-artifact@v4
         with:
           name: mnist-model-metaflow
-          path: mnist_model/
+          path: model.pkl
 
   Metaflow_sentiment_job:
     needs: check-files
@@ -170,7 +169,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sentiment-model-metaflow
-          path: sentiment_model/
+          path: model_sentiment.pkl
         
   Airflow_job:
     needs: check-files

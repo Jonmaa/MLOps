@@ -9,6 +9,7 @@ import pandas as pd
 import io
 import numpy as np
 import torch
+import pickle
 import base64
 from sklearn.manifold import TSNE
 from metaflow.cards import Markdown, Image
@@ -44,6 +45,12 @@ class IMDBSentimentFlow(FlowSpec):
             max_length=512,
             device=-1
         )
+
+        with open("model_sentiment.pkl", "wb") as f:
+            pickle.dump({
+                "model": self.classifier.model,
+                "tokenizer": self.tokenizer
+            }, f)
 
         self.next(self.predict)
 
@@ -105,8 +112,6 @@ class IMDBSentimentFlow(FlowSpec):
     @step
     def end(self):
         print("🎉 IMDB Sentiment analysis finalizado.")
-        self.classifier.model.save_pretrained("sentiment_model/")
-        self.tokenizer.save_pretrained("sentiment_model/")
 
 if __name__ == "__main__":
     IMDBSentimentFlow()
