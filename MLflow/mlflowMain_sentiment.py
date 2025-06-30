@@ -34,6 +34,7 @@ mlflow.set_experiment("IMDB-Sentiment")
 
 model_name = "distilbert-base-uncased-finetuned-sst-2-english"
 
+
 with mlflow.start_run() as run:
     mlflow.log_param("model_name", model_name)
     mlflow.log_param("max_length", 512)
