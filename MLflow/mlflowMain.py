@@ -140,47 +140,55 @@ with mlflow.start_run() as run:
     print(f"✍️ Signature: {signature}")
 
     # Loguear modelo como pyfunc
+    # Loguear modelo como pyfunc
     mlflow.pyfunc.log_model(
         artifact_path="mnist_model",
         python_model=PyTorchWrapper(model),
         input_example=example_input_df,
         signature=signature
     )
-
-    # Métricas, tags y artefactos
-    mlflow.log_metric("num_parameters", sum(p.numel() for p in model.parameters()))
-    mlflow.set_tag("model_type", model.__class__.__name__)
-    mlflow.set_tag("dataset", "MNIST")
-    mlflow.set_tag("framework", "PyTorch")
-
-    # Registrar en Model Registry
-    result = mlflow.register_model(
-        model_uri=f"runs:/{run.info.run_id}/mnist_model",
-        name="MNIST-Classifier"
-    )
-
-    time.sleep(10)
+    
+    # Registrar modelo manualmente con la API clásica
+    model_uri = f"runs:/{run.info.run_id}/mnist_model"
     client = MlflowClient()
+    
+    # Crear registro si no existe
+    try:
+        client.create_registered_model("MNIST-Classifier")
+    except mlflow.exceptions.MlflowException as e:
+        if "RESOURCE_ALREADY_EXISTS" not in str(e):
+            raise
+        
+    # Crear versión
+    result = client.create_model_version(
+        name="MNIST-Classifier",
+        source=mlflow.get_artifact_uri("mnist_model"),
+        run_id=run.info.run_id
+    )
+    
+    # Esperar unos segundos y aplicar descripciones y transición de etapa
+    import time
+    time.sleep(10)
+    
     client.update_registered_model(
         name="MNIST-Classifier",
         description="Clasificador de dígitos MNIST con arquitecturas de redes neuronales usando PyTorch y PyFunc."
     )
+    
     client.update_model_version(
         name="MNIST-Classifier",
         version=result.version,
         description=(
             f"Modelo entrenado con arquitectura {model.__class__.__name__} "
-            f"y parámetros: learning rate={lr}, batch size={batch_size}, optimizador " + optimizer.__class__.__name__ 
+            f"y parámetros: learning rate={lr}, batch size={batch_size}, optimizador {optimizer.__class__.__name__}"
         )
     )
+    
     client.transition_model_version_stage(
         name="MNIST-Classifier",
         version=result.version,
         stage="Production"
     )
-
-    
-
 
 print("✅ Entrenamiento, logueo y registro finalizado.")
 
