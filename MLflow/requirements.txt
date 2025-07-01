@@ -1,6 +1,6 @@
 torch
 torchvision
-mlflow
+mlflow==2.9.2
 numpy
 pandas
 scikit-learn
