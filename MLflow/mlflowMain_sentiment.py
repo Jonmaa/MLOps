@@ -28,11 +28,11 @@ class SentimentWrapper(mlflow.pyfunc.PythonModel):
         return pd.DataFrame(preds)
 
 
-
 mlflow.set_tracking_uri("http://167.99.84.228:5000")
 mlflow.set_experiment("IMDB-Sentiment")
 
 model_name = "distilbert-base-uncased-finetuned-sst-2-english"
+
 
 
 with mlflow.start_run() as run:
