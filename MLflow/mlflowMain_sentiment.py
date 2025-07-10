@@ -62,8 +62,7 @@ with mlflow.start_run() as run:
     # 4) Registra en Model Registry
     result = mlflow.register_model(
         model_uri=f"runs:/{run.info.run_id}/sentiment_model",
-        name="IMDB-Sentiment-Classifier",
-        description="Sentiment analysis model for IMDB reviews using {model_name} y {max_length} tokens.}"
+        name="IMDB-Sentiment-Classifier"
     )
 
     time.sleep(10)
