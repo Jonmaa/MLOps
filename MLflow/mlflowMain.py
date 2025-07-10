@@ -24,8 +24,8 @@ class PyTorchWrapper(mlflow.pyfunc.PythonModel):
 
 
 # Datos
-batch_size = 32
-lr = 0.001
+batch_size = 64
+lr = 0.01
 num_epochs = 5
 transform = transforms.Compose([transforms.ToTensor()])
 train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
