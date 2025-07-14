@@ -24,8 +24,8 @@ class PyTorchWrapper(mlflow.pyfunc.PythonModel):
 
 
 # Datos
-batch_size = 32
-lr = 0.01
+batch_size = 128
+lr = 0.001
 num_epochs = 5
 transform = transforms.Compose([transforms.ToTensor()])
 train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
@@ -98,7 +98,7 @@ class CNN_Model(nn.Module): # Modelo de red convolucional para mejorar los patro
         return x
 
 
-model = SimpleNN()
+model = DeepNN()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 criterion = nn.CrossEntropyLoss()
 
